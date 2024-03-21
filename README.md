@@ -1,4 +1,5 @@
-# VK to CcommercMLeml
+# VK to CommerceML
+Telegram bot that can synchronize VK products to a website using the CommerceML protocol.
 
 ## Build and push docker image
 ```shell

@@ -1,0 +1,31 @@
+version: "3.9"
+services:
+  app:
+    image: poofeg/vk-to-commerceml
+    environment:
+      REDIS_URL: redis://redis/0
+      VK__OAUTH_CALLBACK_URL:
+      CML__CATALOG_URL:
+      BOT_TOKEN:
+      OAUTH_CALLBACK_URL:
+      VK__CLIENT_ID:
+      VK__CLIENT_SECRET:
+      VK__GROUP_ID:
+      CML__URL:
+      CML__LOGIN:
+      CML__PASSWORD:
+
+    depends_on:
+      - redis
+    ports:
+      - "8080:8080"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:

@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "vk-to-commerceml"
+version = "0.1.0"
+description = ""
+authors = ["Alexey Vaganov"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2.5.3"
+pydantic-xml = {version = "^2.8.1", extras = ["lxml"]}
+pydantic-settings = "^2.2.1"
+typer = {extras = ["all"], version = "^0.9.0"}
+aiohttp = {extras = ["aiodns"], version = "^3.9.3"}
+fastapi = "^0.110.0"
+uvicorn = {extras = ["standard"], version = "^0.27.1"}
+aiogram = {extras = ["redis"], version = "^3.4.1"}
+
+[tool.poetry.group.dev.dependencies]
+mypy = {version = "^1.9.0", extras = ["dmypy"]}
+types-aiofiles = "^23.2.0.20240311"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

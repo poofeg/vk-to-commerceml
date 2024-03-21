@@ -7,11 +7,11 @@ from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
-from vk_to_commerceml import vk_models
-from vk_to_commerceml.cml_client import CmlClient
-from vk_to_commerceml.cml_models import CatalogClassifier, Catalog, Product, PropertyValue, DetailValue, \
-    Group, Property, ImportDocument, OffersDocument, PackageOfOffers, Offer, PriceType, Price
-from vk_to_commerceml.vk_client import VkClient
+from vk_to_commerceml.infrastructure.vk import models as vk_models
+from vk_to_commerceml.infrastructure.cml.client import CmlClient
+from vk_to_commerceml.infrastructure.cml.models import CatalogClassifier, Catalog, Product, PropertyValue, \
+    DetailValue, Group, Property, ImportDocument, OffersDocument, PackageOfOffers, Offer, PriceType, Price
+from vk_to_commerceml.infrastructure.vk.client import VkClient
 
 RE_PROPERTIES_AREA = re.compile(r'^(.*?)\s*--\s*(.*)$', re.DOTALL)
 RE_PROPERTIES = re.compile(r'^\s*(.*?)\s*:\s*(.*?)\s*$', re.MULTILINE)

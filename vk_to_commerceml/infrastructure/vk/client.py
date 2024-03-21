@@ -13,7 +13,7 @@ from aiohttp.client_reqrep import json_re
 from pydantic import ValidationError, SecretStr
 from yarl import URL
 
-from vk_to_commerceml.vk_models import MarketGetRoot, Photo, MarketItem, ErrorResponse, VkBaseModel, MarketEditRoot
+from vk_to_commerceml.infrastructure.vk.models import MarketGetRoot, Photo, MarketItem, ErrorResponse, VkBaseModel, MarketEditRoot
 
 logger = logging.getLogger(__name__)
 VK_URL = URL('https://api.vk.com/method')

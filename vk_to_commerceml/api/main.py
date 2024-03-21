@@ -8,9 +8,9 @@ from fastapi.responses import RedirectResponse
 from vk_to_commerceml.api import bot, oauth
 from vk_to_commerceml.app_state import app_state
 from vk_to_commerceml.bot.main import start_telegram, stop_telegram
-from vk_to_commerceml.cml_client import CmlClient
+from vk_to_commerceml.infrastructure.cml.client import CmlClient
 from vk_to_commerceml.settings import settings
-from vk_to_commerceml.vk_client import VkClient
+from vk_to_commerceml.infrastructure.vk.client import VkClient
 
 logger = logging.getLogger(__name__)
 

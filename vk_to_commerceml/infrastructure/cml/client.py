@@ -5,7 +5,7 @@ from aiohttp import ClientSession, BasicAuth, hdrs, TCPConnector
 from pydantic import SecretStr
 from yarl import URL
 
-from vk_to_commerceml.cml_models import ImportDocument, OffersDocument
+from vk_to_commerceml.infrastructure.cml.models import ImportDocument, OffersDocument
 
 logger = logging.getLogger(__name__)
 

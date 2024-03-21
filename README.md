@@ -7,3 +7,4 @@ docker buildx build \
   --tag 'poofeg/vk-to-commerceml:latest' \
   --platform=linux/amd64,linux/arm64 --pull --push .
 ```
+Pre-built images available on Docker Hub: https://hub.docker.com/r/poofeg/vk-to-commerceml

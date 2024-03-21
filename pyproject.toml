@@ -1,9 +1,10 @@
 [tool.poetry]
 name = "vk-to-commerceml"
 version = "0.1.0"
-description = ""
-authors = ["Alexey Vaganov"]
+description = "Telegram bot that can synchronize VK products to a website using the CommerceML protocol"
+authors = ["Alexey Vaganov <poofeg@gmail.com>"]
 license = "MIT"
+repository = "https://github.com/poofeg/vk-to-commerceml"
 readme = "README.md"
 
 [tool.poetry.dependencies]

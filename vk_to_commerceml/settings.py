@@ -7,7 +7,6 @@ from pydantic_settings import BaseSettings
 class Vk(BaseModel):
     client_id: str
     client_secret: SecretStr
-    group_id: int
     oauth_callback_url: HttpUrl
 
 

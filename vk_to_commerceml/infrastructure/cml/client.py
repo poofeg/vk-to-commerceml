@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import logging
 
 from aiohttp import ClientSession, BasicAuth, hdrs, TCPConnector
@@ -19,7 +20,7 @@ class CmlClientSession:
 
     async def __import(self, session: ClientSession, filename: str) -> bool:
         logger.info('CommerceML: import %s', filename)
-        while True:
+        for sleep_delay in itertools.count(start=1):
             async with session.get(
                 self.__url,
                 params={'type': 'catalog', 'mode': 'import', 'filename': filename},
@@ -28,7 +29,7 @@ class CmlClientSession:
                 result = (await response.text()).strip()
                 logger.info('Response: %s', result)
             if result == 'progress':
-                await asyncio.sleep(1)
+                await asyncio.sleep(sleep_delay)
                 continue
             return result == 'success'
 

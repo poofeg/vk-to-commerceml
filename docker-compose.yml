@@ -3,17 +3,13 @@ services:
   app:
     image: poofeg/vk-to-commerceml
     environment:
-      REDIS_URL: redis://redis/0
-      VK__OAUTH_CALLBACK_URL:
-      CML__CATALOG_URL:
       BOT_TOKEN:
-      OAUTH_CALLBACK_URL:
+      BASE_WEBHOOK_URL:
+      VK__OAUTH_CALLBACK_URL:
       VK__CLIENT_ID:
       VK__CLIENT_SECRET:
-      VK__GROUP_ID:
-      CML__URL:
-      CML__LOGIN:
-      CML__PASSWORD:
+      REDIS_URL: redis://redis/0
+      ENCRYPTION_KEY:
 
     depends_on:
       - redis

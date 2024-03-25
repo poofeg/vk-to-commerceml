@@ -149,7 +149,8 @@ class VkClient:
         await self.__session.close()
         await self.__context_tmp_dir.aclose()
 
-    async def get_access_token(self, client_id: str, client_secret: SecretStr, redirect_uri: str, code: str) -> str:
+    async def get_access_token(self, client_id: str, client_secret: SecretStr, redirect_uri: str,
+                               code: str) -> SecretStr:
         params: dict[str, str] = {
             'client_id': client_id,
             'client_secret': client_secret.get_secret_value(),
@@ -159,7 +160,7 @@ class VkClient:
         async with self.__session.post('https://oauth.vk.com/access_token', params=params) as response:
             response.raise_for_status()
             data = await response.json()
-        return data['access_token']
+        return SecretStr(data['access_token'])
 
     async def get_session(self, access_token: SecretStr) -> VkClientSession:
         if not self.__tmp_dir:

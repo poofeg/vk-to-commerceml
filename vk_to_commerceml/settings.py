@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     base_webhook_url: Optional[str] = None
     vk: Vk
     redis_url: RedisDsn = 'redis://'
+    encryption_key: bytes = b'change_me'
 
     class Config:
         env_nested_delimiter = '__'

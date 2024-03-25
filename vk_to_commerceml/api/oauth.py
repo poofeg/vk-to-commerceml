@@ -27,7 +27,7 @@ async def oauth_callback(code: str = Query(), state: str = Query()) -> RedirectR
         redirect_uri=str(settings.vk.oauth_callback_url),
         code=code,
     )
-    await app_state.bot_storage.update_data(key, {'vk_token': access_token})
+    await app_state.bot_storage.update_data(key, {'vk_token': app_state.secrets.encrypt(access_token)})
     await app_state.bot_storage.set_state(key, Form.vk_authorized)
 
     message = await bot.send_message(

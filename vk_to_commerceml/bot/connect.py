@@ -48,8 +48,8 @@ async def default_authorized_handler(message: types.Message) -> None:
 async def enter_cml_password(message: types.Message, state: FSMContext) -> None:
     if not message.text:
         return
-    password = message.text.strip()
-    await state.update_data(cml_password=password)
+    password = SecretStr(message.text.strip())
+    await state.update_data(cml_password=app_state.secrets.encrypt(password))
     await state.set_state(Form.cml_password_entered)
     await message.delete()
     await message.answer('Пароль CommerceML сохранен')
@@ -106,7 +106,7 @@ async def select_site(message: types.Message) -> None:
 @router.callback_query(Form.vk_authorized, VkGroupCallback.filter())
 async def callback_vk_group(query: types.CallbackQuery, callback_data: VkGroupCallback, state: FSMContext) -> None:
     data = await state.get_data()
-    vk_token = SecretStr(data['vk_token'])
+    vk_token = app_state.secrets.decrypt(data['vk_token'])
     vk_client = await app_state.vk_client.get_session(vk_token)
     groups = await vk_client.get_groups()
     group = next(iter(group for group in groups if group.id == callback_data.id), None)
@@ -124,7 +124,7 @@ async def callback_vk_group(query: types.CallbackQuery, callback_data: VkGroupCa
 @router.message(Form.vk_authorized)
 async def select_vk_group(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
-    vk_token = SecretStr(data['vk_token'])
+    vk_token = app_state.secrets.decrypt(data['vk_token'])
     vk_client = await app_state.vk_client.get_session(vk_token)
     groups = await vk_client.get_groups()
 

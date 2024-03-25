@@ -6,7 +6,6 @@ from aiogram.filters import Command
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from pydantic import SecretStr
 
 from vk_to_commerceml.app_state import app_state
 from vk_to_commerceml.bot.models import SITE_CML_URLS, SITE_CATALOG_URLS
@@ -26,11 +25,11 @@ class SyncCallback(CallbackData, prefix='sync'):
 async def callback_sync(query: types.CallbackQuery, callback_data: SyncCallback, state: FSMContext) -> None:
     started_at = datetime.now()
     data = await state.get_data()
-    vk_token = SecretStr(data['vk_token'])
+    vk_token = app_state.secrets.decrypt(data['vk_token'])
     vk_group_id: int = data['vk_group_id']
     cml_url: str = SITE_CML_URLS[data['cml_site']]
     cml_login: str = data['cml_login']
-    cml_password = SecretStr(data['cml_password'])
+    cml_password = app_state.secrets.decrypt(data['cml_password'])
     await state.update_data(sync=callback_data.model_dump_json(exclude={'start'}))
     sync_service = SyncService(
         app_state.cml_client, cml_url, cml_login, cml_password,

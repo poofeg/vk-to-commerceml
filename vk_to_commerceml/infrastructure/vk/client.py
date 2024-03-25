@@ -13,15 +13,17 @@ from aiohttp.client_reqrep import json_re
 from pydantic import ValidationError, SecretStr
 from yarl import URL
 
-from vk_to_commerceml.infrastructure.vk.models import MarketGetRoot, Photo, MarketItem, ErrorResponse, VkBaseModel, MarketEditRoot
+from vk_to_commerceml.infrastructure.vk.models import MarketGetRoot, Photo, MarketItem, ErrorResponse, VkBaseModel, \
+    MarketEditRoot, GroupsGetRoot, GroupItem
 
 logger = logging.getLogger(__name__)
+OAUTH_URL = 'https://oauth.vk.com/authorize'
 VK_URL = URL('https://api.vk.com/method')
 T_VkBaseModel = TypeVar('T_VkBaseModel', bound=VkBaseModel)
 
 
 class VkClientSession:
-    def __init__(self, session: ClientSession, access_token: str, tmp_dir: str) -> None:
+    def __init__(self, session: ClientSession, access_token: SecretStr, tmp_dir: str) -> None:
         self.__session = session
         self.__access_token = access_token
         self.__tmp_dir = tmp_dir
@@ -41,11 +43,24 @@ class VkClientSession:
                 pass
             return response_model.model_validate_json(data)
 
+    async def get_groups(self) -> list[GroupItem]:
+        url = VK_URL / 'groups.get'
+        params: dict[str, str] = {
+            'access_token': self.__access_token.get_secret_value(),
+            'extended': '1',
+            'filter': 'advertiser',
+            'v': '5.199',
+        }
+        root = await self.__request(
+            GroupsGetRoot, hdrs.METH_GET, url, params=params
+        )
+        return root.response.items
+
     async def get_market(self, owner_id: int, with_disabled: bool) -> list[MarketItem]:
         url = VK_URL / 'market.get'
         page_size = 200
         common_params: dict[str, str] = {
-            'access_token': self.__access_token,
+            'access_token': self.__access_token.get_secret_value(),
             'owner_id': str(owner_id),
             'count': str(page_size),
             'extended': '1',
@@ -71,7 +86,7 @@ class VkClientSession:
     async def get_market_product_by_id(self, owner_id: int, item_id: int) -> Optional[MarketItem]:
         url = VK_URL / 'market.getById'
         params: dict[str, str] = {
-            'access_token': self.__access_token,
+            'access_token': self.__access_token.get_secret_value(),
             'item_ids': f'{owner_id}_{item_id}',
             'extended': '1',
             'v': '5.199',
@@ -85,7 +100,7 @@ class VkClientSession:
     async def edit_market_item(self, owner_id: int, item_id: int, description: str) -> bool:
         url = VK_URL / 'market.edit'
         data: dict[str, str] = {
-            'access_token': self.__access_token,
+            'access_token': self.__access_token.get_secret_value(),
             'owner_id': str(owner_id),
             'item_id': str(item_id),
             'description': description,
@@ -146,7 +161,7 @@ class VkClient:
             data = await response.json()
         return data['access_token']
 
-    async def get_session(self, access_token: str) -> VkClientSession:
+    async def get_session(self, access_token: SecretStr) -> VkClientSession:
         if not self.__tmp_dir:
             self.__tmp_dir = await self.__context_tmp_dir.enter_async_context(
                 aiofiles.tempfile.TemporaryDirectory()

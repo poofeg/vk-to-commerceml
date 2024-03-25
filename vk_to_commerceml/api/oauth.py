@@ -1,9 +1,12 @@
+from aiogram.fsm.context import FSMContext
 from aiogram.utils.link import create_telegram_link
 from fastapi import APIRouter, Query
 from fastapi.responses import RedirectResponse
 
 from vk_to_commerceml.app_state import app_state
-from vk_to_commerceml.bot.main import Form, bot
+from vk_to_commerceml.bot.connect import select_vk_group
+from vk_to_commerceml.bot.main import bot
+from vk_to_commerceml.bot.states import Form
 from vk_to_commerceml.settings import settings
 
 router = APIRouter(
@@ -25,6 +28,10 @@ async def oauth_callback(code: str = Query(), state: str = Query()) -> RedirectR
         code=code,
     )
     await app_state.bot_storage.update_data(key, {'vk_token': access_token})
-    await app_state.bot_storage.set_state(key, Form.authorized)
-    await bot.send_message(key.chat_id, 'Авторизация прошла успешно. Для запуска синхронизации используй команду /sync')
+    await app_state.bot_storage.set_state(key, Form.vk_authorized)
+
+    message = await bot.send_message(
+        key.chat_id, 'Авторизация в ВК прошла успешно.'
+    )
+    await select_vk_group(message=message, state=FSMContext(app_state.bot_storage, key))
     return RedirectResponse(url=create_telegram_link(bot_info.username), status_code=303)

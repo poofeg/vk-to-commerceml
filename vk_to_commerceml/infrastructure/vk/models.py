@@ -10,6 +10,11 @@ class VkBaseModel(BaseModel):
     pass
 
 
+class GroupItem(VkBaseModel):
+    id: int
+    name: str
+
+
 class Price(VkBaseModel):
     amount: Decimal
     old_amount: Optional[Decimal] = None
@@ -58,7 +63,16 @@ class MarketItem(VkBaseModel):
     photos: list[Photo] = []
     videos: list[Video] = []
     owner_info: OwnerInfo
-    date: datetime
+    date: datetime = None
+
+
+class GroupsGetResponse(VkBaseModel):
+    count: int
+    items: list[GroupItem] = []
+
+
+class GroupsGetRoot(VkBaseModel):
+    response: GroupsGetResponse
 
 
 class MarketGetResponse(VkBaseModel):

@@ -10,15 +10,12 @@ from vk_to_commerceml.infrastructure.cml.models import ImportDocument, OffersDoc
 logger = logging.getLogger(__name__)
 
 
-class CmlClient:
-    def __init__(self, url: str, login: str, password: SecretStr) -> None:
+class CmlClientSession:
+    def __init__(self, connector: TCPConnector, url: str, login: str, password: SecretStr) -> None:
         self.__url = URL(url)
         self.__login = login
         self.__password = password
-        self.__connector = TCPConnector()
-
-    async def close(self) -> None:
-        await self.__connector.close()
+        self.__connector = connector
 
     async def __import(self, session: ClientSession, filename: str) -> bool:
         logger.info('CommerceML: import %s', filename)
@@ -91,3 +88,14 @@ class CmlClient:
             if offers_document:
                 await self.__import(session, 'offers.xml')
             return True
+
+
+class CmlClient:
+    def __init__(self) -> None:
+        self.__connector = TCPConnector()
+
+    async def close(self) -> None:
+        await self.__connector.close()
+
+    async def get_session(self, url: str, login: str, password: SecretStr) -> CmlClientSession:
+        return CmlClientSession(self.__connector, url, login, password)

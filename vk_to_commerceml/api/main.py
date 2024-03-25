@@ -9,7 +9,6 @@ from vk_to_commerceml.api import bot, oauth
 from vk_to_commerceml.app_state import app_state
 from vk_to_commerceml.bot.main import start_telegram, stop_telegram
 from vk_to_commerceml.infrastructure.cml.client import CmlClient
-from vk_to_commerceml.settings import settings
 from vk_to_commerceml.infrastructure.vk.client import VkClient
 
 logger = logging.getLogger(__name__)
@@ -20,11 +19,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     logging.basicConfig(level=logging.INFO)
     logger.info('🚀 Starting application')
     app_state.vk_client = VkClient()
-    app_state.cml_client = CmlClient(
-        url=str(settings.cml.url),
-        login=settings.cml.login,
-        password=settings.cml.password,
-    )
+    app_state.cml_client = CmlClient()
     await start_telegram()
     yield
     logger.info('⛔ Stopping application')

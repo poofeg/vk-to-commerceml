@@ -7,6 +7,8 @@ from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
+from pydantic import SecretStr
+
 from vk_to_commerceml.infrastructure.vk import models as vk_models
 from vk_to_commerceml.infrastructure.cml.client import CmlClient
 from vk_to_commerceml.infrastructure.cml.models import CatalogClassifier, Catalog, Product, PropertyValue, \
@@ -30,16 +32,21 @@ class SyncState(Enum):
 
 
 class SyncService:
-    def __init__(self, cml_client: CmlClient, vk_client: VkClient, vk_token: str) -> None:
+    def __init__(self, cml_client: CmlClient, cml_url: str, cml_login: str, cml_password: SecretStr,
+                 vk_client: VkClient, vk_token: SecretStr, vk_group_id: int) -> None:
         self.__cml_client = cml_client
+        self.__cml_url = cml_url
+        self.__cml_login = cml_login
+        self.__cml_password = cml_password
         self.__vk_client = vk_client
         self.__vk_token = vk_token
+        self.__vk_group_id = vk_group_id
 
     async def sync(self, with_disabled: bool = False, with_photos: bool = False,
                    skip_multiple_group: bool = False) -> AsyncIterator[tuple[SyncState, str | int | None]]:
         vk_client = await self.__vk_client.get_session(self.__vk_token)
         try:
-            market = await vk_client.get_market(-186635238, with_disabled)
+            market = await vk_client.get_market(-self.__vk_group_id, with_disabled)
         except Exception as exc:
             logger.exception('Get products failure: %s', exc)
             yield SyncState.GET_PRODUCTS_FAILED, str(exc)
@@ -74,7 +81,7 @@ class SyncService:
                     f'<a href="{url}" target="_blank">Видео "{video.title}" ({timedelta(seconds=video.duration)})</a>')
             if video_urls:
                 description += '\n\n' + '\n'.join(video_urls)
-            new = item.date > datetime.now(timezone.utc) - timedelta(days=31)
+            new = item.date > datetime.now(timezone.utc) - timedelta(days=31) if item.date else False
             if item.availability == vk_models.Availability.PRESENTED:
                 if new:
                     group_ids = ['new', group_id] if not skip_multiple_group else []
@@ -132,8 +139,9 @@ class SyncService:
                 offers=offers,
             )
         )
+        cml_client_session = await self.__cml_client.get_session(self.__cml_url, self.__cml_login, self.__cml_password)
         try:
-            await self.__cml_client.upload(import_document, offers_document)
+            await cml_client_session.upload(import_document, offers_document)
         except Exception as exc:
             logger.exception('Main sync failure: %s', exc)
             yield SyncState.MAIN_FAILED, str(exc)
@@ -165,7 +173,7 @@ class SyncService:
             )
             photos.update(item_photos)
         try:
-            await self.__cml_client.upload(import_document=images_document, photos=photos)
+            await cml_client_session.upload(import_document=images_document, photos=photos)
         except Exception as exc:
             logger.exception('Photo sync failure: %s', exc)
             yield SyncState.PHOTO_FAILED, str(exc)

@@ -11,18 +11,10 @@ class Vk(BaseModel):
     oauth_callback_url: HttpUrl
 
 
-class Cml(BaseModel):
-    url: HttpUrl
-    login: str
-    password: SecretStr
-    catalog_url: HttpUrl
-
-
 class Settings(BaseSettings):
     bot_token: SecretStr = '1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     base_webhook_url: Optional[str] = None
     vk: Vk
-    cml: Cml
     redis_url: RedisDsn = 'redis://'
 
     class Config:

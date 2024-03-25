@@ -28,7 +28,7 @@ class CmlClientSession:
                 response.raise_for_status()
                 result = (await response.text()).strip()
                 logger.info('Response: %s', result)
-            if result == 'progress':
+            if result == 'progress' or 'Too many requests' in result:
                 await asyncio.sleep(sleep_delay)
                 continue
             return result == 'success'

@@ -163,7 +163,7 @@ class SyncService:
             if item.availability != vk_models.Availability.PRESENTED:
                 continue
             logger.info('Product photo upload: %s [%d]', item.title, item.id)
-            item_photos = await vk_client.download_photos(item.photos, max_width=1280)
+            item_photos = await vk_client.download_photos(item.photos, max_width=807)
             images_document.catalog.products.append(
                 Product(
                     id=f'vk_{item.id}',

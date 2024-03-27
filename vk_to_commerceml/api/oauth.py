@@ -40,6 +40,10 @@ async def oauth_callback(code: str = Query(), state: str = Query()) -> RedirectR
 
 @router.get('/redirect/{state}', status_code=303)
 async def redirect(state: str) -> RedirectResponse:
+    bot_info = await bot.me()
+    assert bot_info.username
+    if state not in app_state.oauth_request_state_keys:
+        return RedirectResponse(url=create_telegram_link(bot_info.username, start='auth_fail'), status_code=303)
     url = OAUTH_URL.with_query({
         'client_id': settings.vk.client_id,
         'display': 'mobile',

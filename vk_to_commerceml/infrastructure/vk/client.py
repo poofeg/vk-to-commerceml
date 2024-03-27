@@ -17,7 +17,7 @@ from vk_to_commerceml.infrastructure.vk.models import MarketGetRoot, Photo, Mark
     MarketEditRoot, GroupsGetRoot, GroupItem
 
 logger = logging.getLogger(__name__)
-OAUTH_URL = 'https://oauth.vk.com/authorize'
+OAUTH_URL = URL('https://oauth.vk.com/authorize')
 VK_URL = URL('https://api.vk.com/method')
 T_VkBaseModel = TypeVar('T_VkBaseModel', bound=VkBaseModel)
 

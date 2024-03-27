@@ -13,7 +13,6 @@ from yarl import URL
 from vk_to_commerceml.app_state import app_state
 from vk_to_commerceml.bot.models import Site, SITE_DISPLAY_NAMES
 from vk_to_commerceml.bot.states import Form
-from vk_to_commerceml.infrastructure.vk.client import OAUTH_URL
 from vk_to_commerceml.settings import settings
 
 router = Router()
@@ -142,15 +141,7 @@ async def select_vk_group(message: types.Message, state: FSMContext) -> None:
 async def default_handler(message: types.Message, state: FSMContext) -> None:
     state_code = token_urlsafe()
     app_state.oauth_request_state_keys[state_code] = state.key
-    url = URL(OAUTH_URL).with_query({
-        'client_id': settings.vk.client_id,
-        'display': 'mobile',
-        'redirect_uri': str(settings.vk.oauth_callback_url),
-        'scope': 'offline,market',
-        'response_type': 'code',
-        'state': state_code,
-        'v': '5.199',
-    })
+    url = URL(str(settings.base_url)) / 'oauth' / 'redirect' / state_code
     await message.answer(
         f'Привет, {hbold(message.from_user.full_name)}! Боту нужен доступ к товарам ВК.',
         parse_mode='HTML',

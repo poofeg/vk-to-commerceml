@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import HttpUrl, BaseModel, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings
 
@@ -12,7 +10,7 @@ class Vk(BaseModel):
 
 class Settings(BaseSettings):
     bot_token: SecretStr = '1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    base_webhook_url: Optional[str] = None
+    base_url: HttpUrl = 'http://127.0.0.1:8000'
     vk: Vk
     redis_url: RedisDsn = 'redis://'
     encryption_key: bytes = b'change_me'

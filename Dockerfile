@@ -21,6 +21,6 @@ FROM python:3.12-alpine
 WORKDIR /app
 COPY --from=build /app /app
 EXPOSE 8080/tcp
-CMD ["/app/.venv/bin/uvicorn", "--log-level=info", "--proxy-headers", \
+CMD ["/app/.venv/bin/uvicorn", "--log-level=info", "--proxy-headers", "--forwarded-allow-ips=*", \
      "--host", "0.0.0.0", "--port", "8080", \
      "vk_to_commerceml.api.main:app"]

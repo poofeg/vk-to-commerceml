@@ -4,7 +4,7 @@ services:
     image: poofeg/vk-to-commerceml
     environment:
       BOT_TOKEN:
-      BASE_WEBHOOK_URL:
+      BASE_URL:
       VK__OAUTH_CALLBACK_URL:
       VK__CLIENT_ID:
       VK__CLIENT_SECRET:

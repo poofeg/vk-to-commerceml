@@ -11,7 +11,7 @@ from pydantic import SecretStr
 from yarl import URL
 
 from vk_to_commerceml.app_state import app_state
-from vk_to_commerceml.bot.models import Site, SITE_DISPLAY_NAMES
+from vk_to_commerceml.bot.models import Site, SITE_DISPLAY_NAMES, SITE_CML_URLS
 from vk_to_commerceml.bot.states import Form
 from vk_to_commerceml.settings import settings
 
@@ -61,7 +61,7 @@ async def prompt_cml_password(message: types.Message) -> None:
     await message.answer('Введите пароль CommerceML')
 
 
-@router.message(Form.cml_site_selected, F.text)
+@router.message(Form.cml_url_entered, F.text)
 async def enter_cml_login(message: types.Message, state: FSMContext) -> None:
     if not message.text:
         return
@@ -73,31 +73,56 @@ async def enter_cml_login(message: types.Message, state: FSMContext) -> None:
     await prompt_cml_password(message=message)
 
 
-@router.message(Form.cml_site_selected)
+@router.message(Form.cml_url_entered)
 async def prompt_cml_login(message: types.Message) -> None:
     await message.answer('Введите имя пользователя CommerceML')
 
 
+@router.message(Form.cml_site_selected, F.text)
+async def enter_cml_url(message: types.Message, state: FSMContext) -> None:
+    if not message.text:
+        return
+    cml_url = message.text.strip()
+    await state.update_data(cml_url=cml_url)
+    await state.set_state(Form.cml_url_entered)
+    await message.delete()
+    await message.answer(f'Адрес CommerceML сохранен: `{cml_url}`', parse_mode=ParseMode.MARKDOWN_V2)
+    await prompt_cml_login(message=message)
+
+
+@router.message(Form.cml_site_selected)
+async def prompt_cml_url(message: types.Message) -> None:
+    await message.answer('Введите адрес CommerceML (например https://сайт/bitrix/admin/1c_exchange.php)')
+
+
 @router.callback_query(Form.vk_group_selected, SiteCallback.filter())
 async def callback_site(query: types.CallbackQuery, callback_data: SiteCallback, state: FSMContext) -> None:
-    await state.update_data(cml_site=callback_data.name)
-    await state.set_state(Form.cml_site_selected)
+    cml_url = SITE_CML_URLS.get(callback_data.name)
+    if cml_url:
+        await state.update_data(cml_site=callback_data.name, cml_url=cml_url)
+        await state.set_state(Form.cml_url_entered)
+    else:
+        await state.update_data(cml_site=callback_data.name)
+        await state.set_state(Form.cml_site_selected)
     await query.answer('Сайт сохранен')
     await query.message.delete()
     await query.message.answer(
         f'Выбран сайт: `{SITE_DISPLAY_NAMES[callback_data.name]}`',
         parse_mode=ParseMode.MARKDOWN_V2
     )
-    await prompt_cml_login(message=query.message)
-
+    if cml_url:
+        await prompt_cml_login(message=query.message)
+    else:
+        await prompt_cml_url(message=query.message)
 
 @router.message(Form.vk_group_selected)
 async def select_site(message: types.Message) -> None:
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text=SITE_DISPLAY_NAMES[Site.TILDA],
-        callback_data=SiteCallback(name=Site.TILDA),
-    )
+    for site, display_name in SITE_DISPLAY_NAMES.items():
+        builder.button(
+            text=display_name,
+            callback_data=SiteCallback(name=site),
+        )
     builder.adjust(1)
     await message.answer('Какой сайт вы хотите подключить?', reply_markup=builder.as_markup())
 
@@ -139,7 +164,11 @@ async def select_vk_group(message: types.Message, state: FSMContext) -> None:
 
 @router.message()
 async def default_handler(message: types.Message, state: FSMContext) -> None:
-    state_code = token_urlsafe()
+    data = await state.get_data()
+    if not (state_code := data.get('state_code')):
+        state_code = token_urlsafe()
+        await state.update_data(state_code=state_code)
+    await state.set_state(Form.vk_start)
     app_state.oauth_request_state_keys[state_code] = state.key
     url = URL(str(settings.base_url)) / 'oauth' / 'redirect' / state_code
     await message.answer(

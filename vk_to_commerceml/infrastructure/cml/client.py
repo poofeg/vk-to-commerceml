@@ -1,6 +1,8 @@
 import asyncio
 import itertools
 import logging
+from io import BytesIO
+from zipfile import ZipFile
 
 from aiohttp import ClientSession, BasicAuth, hdrs, TCPConnector
 from pydantic import SecretStr
@@ -18,20 +20,21 @@ class CmlClientSession:
         self.__password = password
         self.__connector = connector
 
-    async def __import(self, session: ClientSession, filename: str) -> bool:
+    async def __import(self, session: ClientSession, filename: str, common_params: dict[str, str]) -> bool:
         logger.info('CommerceML: import %s', filename)
         for sleep_delay in itertools.count(start=1):
             async with session.get(
                 self.__url,
-                params={'type': 'catalog', 'mode': 'import', 'filename': filename},
+                params={**common_params, 'mode': 'import', 'filename': filename},
             ) as response:
                 response.raise_for_status()
                 result = (await response.text()).strip()
                 logger.info('Response: %s', result)
-            if result == 'progress' or 'Too many requests' in result:
+            if result.startswith('progress') or 'Too many requests' in result:
                 await asyncio.sleep(sleep_delay)
                 continue
-            return result == 'success'
+            break
+        return result.startswith('success')
 
     async def upload(self, import_document: ImportDocument,
                      offers_document: OffersDocument | None = None,
@@ -46,48 +49,84 @@ class CmlClientSession:
                 auth=BasicAuth(login=self.__login, password=self.__password.get_secret_value(), encoding='utf8'),
             ) as response:
                 response.raise_for_status()
+                auth_response = (await response.text()).splitlines()
+            logger.info('Response: %s', auth_response)
+            if not auth_response or auth_response[0].startswith('failure'):
+                raise Exception('Auth error')
+            common_params = {'type': 'catalog'}
+            if len(auth_response) >= 4 and auth_response[3].startswith('sessid='):
+                common_params['sessid'] = auth_response[3].removeprefix('sessid=')
 
             logger.info('CommerceML: init')
-            async with session.get(self.__url, params={'type': 'catalog', 'mode': 'init'}) as response:
+            async with session.get(self.__url, params={**common_params, 'mode': 'init'}) as response:
                 response.raise_for_status()
-                logger.info('Response: %s', await response.text())
+                response_text = await response.text()
+            logger.info('Response: %s', response_text)
+            zip_bytes = BytesIO()
+            zip_file = ZipFile(zip_bytes, 'w') if 'zip=yes' in response_text else None
 
             if photos:
                 for photo_name, photo_data in photos.items():
-                    logger.info('CommerceML: file %s', photo_name)
-                    async with session.post(
-                        self.__url,
-                        params={'type': 'catalog', 'mode': 'file', 'filename': photo_name},
-                        data=photo_data,
-                        headers={hdrs.CONTENT_TYPE: 'image/jpeg'},
-                    ) as response:
-                        response.raise_for_status()
-                        logger.info('Response: %s', await response.text())
+                    if zip_file:
+                        logger.info('Add file to zip: %s', photo_name)
+                        zip_file.writestr(photo_name, photo_data)
+                    else:
+                        logger.info('CommerceML: file %s', photo_name)
+                        async with session.post(
+                            self.__url,
+                            params={**common_params, 'mode': 'file', 'filename': photo_name},
+                            data=photo_data,
+                            headers={hdrs.CONTENT_TYPE: 'image/jpeg'},
+                        ) as response:
+                            response.raise_for_status()
+                            logger.info('Response: %s', await response.text())
 
-            logger.info('CommerceML: file import.xml')
-            async with session.post(
-                self.__url,
-                params={'type': 'catalog', 'mode': 'file', 'filename': 'import.xml'},
-                data=import_document.to_xml(pretty_print=True, encoding='UTF-8', standalone=True),
-                headers={hdrs.CONTENT_TYPE: 'application/xml; charset=utf-8'},
-            ) as response:
-                response.raise_for_status()
-                logger.info('Response: %s', await response.text())
-
-            if offers_document:
-                logger.info('CommerceML: file offers.xml')
+            import_xml = import_document.to_xml(pretty_print=True, encoding='UTF-8', standalone=True)
+            if zip_file:
+                logger.info('Add file to zip: import.xml')
+                zip_file.writestr('import.xml', import_xml)
+            else:
+                logger.info('CommerceML: file import.xml')
                 async with session.post(
                     self.__url,
-                    params={'type': 'catalog', 'mode': 'file', 'filename': 'offers.xml'},
-                    data=offers_document.to_xml(pretty_print=True, encoding='UTF-8', standalone=True),
+                    params={**common_params, 'mode': 'file', 'filename': 'import.xml'},
+                    data=import_xml,
                     headers={hdrs.CONTENT_TYPE: 'application/xml; charset=utf-8'},
                 ) as response:
                     response.raise_for_status()
                     logger.info('Response: %s', await response.text())
 
-            await self.__import(session, 'import.xml')
             if offers_document:
-                await self.__import(session, 'offers.xml')
+                offers_xml = offers_document.to_xml(pretty_print=True, encoding='UTF-8', standalone=True)
+                if zip_file:
+                    logger.info('Add file to zip: offers.xml')
+                    zip_file.writestr('offers.xml', offers_xml)
+                else:
+                    logger.info('CommerceML: file offers.xml')
+                    async with session.post(
+                        self.__url,
+                        params={**common_params, 'mode': 'file', 'filename': 'offers.xml'},
+                        data=offers_xml,
+                        headers={hdrs.CONTENT_TYPE: 'application/xml; charset=utf-8'},
+                    ) as response:
+                        response.raise_for_status()
+                        logger.info('Response: %s', await response.text())
+
+            if zip_file:
+                zip_file.close()
+                logger.info('CommerceML: file stock.zip')
+                async with session.post(
+                        self.__url,
+                        params={**common_params, 'mode': 'file', 'filename': 'stock.zip'},
+                        data=zip_bytes.getvalue(),
+                        headers={hdrs.CONTENT_TYPE: 'application/zip'},
+                ) as response:
+                    response.raise_for_status()
+                    logger.info('Response: %s', await response.text())
+
+            await self.__import(session, 'import.xml', common_params)
+            if offers_document:
+                await self.__import(session, 'offers.xml', common_params)
             return True
 
 

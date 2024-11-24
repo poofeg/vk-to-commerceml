@@ -1,5 +1,5 @@
 from pydantic import HttpUrl, BaseModel, RedisDsn, SecretStr
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Vk(BaseModel):
@@ -15,8 +15,10 @@ class Settings(BaseSettings):
     redis_url: RedisDsn = 'redis://'
     encryption_key: bytes = b'change_me'
 
-    class Config:
-        env_nested_delimiter = '__'
+    model_config = SettingsConfigDict(
+        env_nested_delimiter='__',
+        nested_model_default_partial_update=True,
+    )
 
 
 settings = Settings()

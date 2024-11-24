@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from vk_to_commerceml.app_state import app_state
-from vk_to_commerceml.bot.models import SITE_CML_URLS, SITE_CATALOG_URLS
+from vk_to_commerceml.bot.models import SITE_CATALOG_URLS, Site
 from vk_to_commerceml.bot.states import Form
 from vk_to_commerceml.services.sync import SyncService, SyncState
 
@@ -27,7 +27,8 @@ async def callback_sync(query: types.CallbackQuery, callback_data: SyncCallback,
     data = await state.get_data()
     vk_token = app_state.secrets.decrypt(data['vk_token'])
     vk_group_id: int = data['vk_group_id']
-    cml_url: str = SITE_CML_URLS[data['cml_site']]
+    cml_site: str = data['cml_site']
+    cml_url: str = data['cml_url']
     cml_login: str = data['cml_login']
     cml_password = app_state.secrets.decrypt(data['cml_password'])
     await state.update_data(sync=callback_data.model_dump_json(exclude={'start'}))
@@ -39,7 +40,8 @@ async def callback_sync(query: types.CallbackQuery, callback_data: SyncCallback,
     await query.message.answer('Запуск синхронизации')
     try:
         async for status, content in sync_service.sync(
-            callback_data.with_disabled, callback_data.with_photos, skip_multiple_group=True
+            callback_data.with_disabled, callback_data.with_photos,
+            skip_multiple_group=True if cml_site == Site.TILDA else False,
         ):
             match status:
                 case SyncState.GET_PRODUCTS_SUCCESS:

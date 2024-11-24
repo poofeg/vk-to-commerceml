@@ -1,4 +1,4 @@
-FROM python:3.12-alpine as builder
+FROM python:3.13-alpine AS builder
 
 RUN apk add --no-cache build-base libffi-dev
 RUN python -m venv /opt/poetry
@@ -7,7 +7,7 @@ RUN /opt/poetry/bin/pip install --no-cache-dir poetry
 RUN ln -svT /opt/poetry/bin/poetry /usr/local/bin/poetry
 RUN poetry config virtualenvs.in-project true
 
-FROM builder as build
+FROM builder AS build
 WORKDIR /app
 
 COPY pyproject.toml poetry.lock README.md ./
@@ -16,7 +16,11 @@ RUN poetry install --no-cache --no-interaction --no-ansi --no-root --without=dev
 COPY vk_to_commerceml vk_to_commerceml
 RUN poetry install --no-cache --no-interaction --no-ansi --without=dev
 
-FROM python:3.12-alpine
+FROM builder AS tests
+RUN poetry install --no-cache --no-interaction --no-ansi
+CMD ["./run-tests"]
+
+FROM python:3.13-alpine
 
 WORKDIR /app
 COPY --from=build /app /app

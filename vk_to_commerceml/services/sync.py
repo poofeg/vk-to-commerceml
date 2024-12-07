@@ -14,6 +14,7 @@ from vk_to_commerceml.infrastructure.cml.client import CmlClient
 from vk_to_commerceml.infrastructure.cml.models import CatalogClassifier, Catalog, Product, PropertyValue, \
     DetailValue, Group, Property, ImportDocument, OffersDocument, PackageOfOffers, Offer, PriceType, Price
 from vk_to_commerceml.infrastructure.vk.client import VkClient
+from vk_to_commerceml.services.csv_writer import CsvWriter
 
 RE_PROPERTIES_AREA = re.compile(r'^(.*?)\s*--\s*(.*)$', re.DOTALL)
 RE_PROPERTIES = re.compile(r'^\s*(.*?)\s*:\s*(.*?)\s*$', re.MULTILINE)
@@ -42,8 +43,10 @@ class SyncService:
         self.__vk_token = vk_token
         self.__vk_group_id = vk_group_id
 
-    async def sync(self, with_disabled: bool = False, with_photos: bool = False,
-                   skip_multiple_group: bool = False) -> AsyncIterator[tuple[SyncState, str | int | None]]:
+    async def sync(
+            self, with_disabled: bool = False, with_photos: bool = False,
+            skip_multiple_group: bool = False, make_csv: bool = False
+    ) -> AsyncIterator[tuple[SyncState, str | int | None]]:
         vk_client = await self.__vk_client.get_session(self.__vk_token)
         try:
             market = await vk_client.get_market(-self.__vk_group_id, with_disabled)
@@ -56,7 +59,7 @@ class SyncService:
         properties: set[Property] = set()
         products: list[Product] = []
         offers: list[Offer] = []
-        csv_rows: list[dict[str, str]] = []
+        csv_writer: CsvWriter | None = CsvWriter() if make_csv else None
         for item in market:
             group_id = item.owner_info.category.lower().replace(' ', '_')
             group_name = item.owner_info.category
@@ -85,13 +88,16 @@ class SyncService:
             if item.availability == vk_models.Availability.PRESENTED:
                 if new:
                     group_ids = ['new', group_id] if not skip_multiple_group else []
-                    csv_rows.append({'External ID': external_id, 'Mark': 'NEW', 'Category': f'new;{group_name}'})
+                    if csv_writer:
+                        csv_writer.write_row(external_id, categories=['new', group_name], mark='NEW')
                 else:
                     group_ids = [group_id]
-                    csv_rows.append({'External ID': external_id, 'Mark': '', 'Category': group_name})
+                    if csv_writer:
+                        csv_writer.write_row(external_id, categories=[group_name])
             else:
                 group_ids = ['продано']
-                csv_rows.append({'External ID': external_id, 'Mark': '', 'Category': 'Продано'})
+                if csv_writer:
+                    csv_writer.write_row(external_id, categories=['Продано'])
             detail_values: list[DetailValue] = []
             if full_name:
                 detail_values.append(DetailValue(name='Полное наименование', value=full_name))
@@ -120,11 +126,6 @@ class SyncService:
                 quantity=Decimal(1) if item.availability == vk_models.Availability.PRESENTED else Decimal(0),
             ))
 
-        csv_file = io.StringIO(newline='')
-        writer = csv.DictWriter(csv_file, fieldnames=['External ID', 'Mark', 'Category', 'Parent UID'])
-        writer.writeheader()
-        writer.writerows(csv_rows)
-
         classifier = CatalogClassifier(groups=list(groups), properties=list(properties))
         import_document = ImportDocument(
             classifier=classifier,
@@ -147,7 +148,7 @@ class SyncService:
             yield SyncState.MAIN_FAILED, str(exc)
             return
 
-        yield SyncState.MAIN_SUCCESS, csv_file.getvalue()
+        yield SyncState.MAIN_SUCCESS, csv_writer.finish() if csv_writer else None
         if not with_photos:
             return
 

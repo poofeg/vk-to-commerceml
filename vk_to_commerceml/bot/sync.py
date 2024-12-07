@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from importlib import resources
 
@@ -12,6 +13,7 @@ from vk_to_commerceml.bot.models import SITE_CATALOG_URLS, Site
 from vk_to_commerceml.bot.states import Form
 from vk_to_commerceml.services.sync import SyncService, SyncState
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 
@@ -41,7 +43,8 @@ async def callback_sync(query: types.CallbackQuery, callback_data: SyncCallback,
     try:
         async for status, content in sync_service.sync(
             callback_data.with_disabled, callback_data.with_photos,
-            skip_multiple_group=True if cml_site == Site.TILDA else False,
+            skip_multiple_group=cml_site == Site.TILDA,
+            make_csv=cml_site == Site.TILDA,
         ):
             match status:
                 case SyncState.GET_PRODUCTS_SUCCESS:
@@ -49,29 +52,32 @@ async def callback_sync(query: types.CallbackQuery, callback_data: SyncCallback,
                 case SyncState.GET_PRODUCTS_FAILED:
                     await query.message.answer(f'Ошибка получения товаров из ВК: {content}')
                 case SyncState.MAIN_SUCCESS:
-                    catalog_url = SITE_CATALOG_URLS[data['cml_site']].format(login=cml_login)
-                    csv_file = types.BufferedInputFile(content.encode('utf8'), filename='categories.csv')
-                    caption = 'Товары успешно отправлены на сайт. Чтобы проставить категорию новым товарам нужно ' \
-                              f'загрузить CSV-файл ниже на {catalog_url}, ' \
-                              'иначе они будут без категории.'
-                    await query.message.answer_media_group(
-                        media=[
-                            types.InputMediaPhoto(
-                                media=types.FSInputFile(
-                                    path=resources.files('vk_to_commerceml.data').joinpath('import_csv_01.png')),
-                            ),
-                            types.InputMediaPhoto(
-                                media=types.FSInputFile(
-                                    path=resources.files('vk_to_commerceml.data').joinpath('import_csv_02.png')),
-                            ),
-                            types.InputMediaPhoto(
-                                media=types.FSInputFile(
-                                    path=resources.files('vk_to_commerceml.data').joinpath('import_csv_03.png')),
-                                caption=caption,
-                            ),
-                        ],
-                    )
-                    await query.message.answer_document(csv_file)
+                    if content:
+                        catalog_url = SITE_CATALOG_URLS[data['cml_site']].format(login=cml_login)
+                        csv_file = types.BufferedInputFile(content.encode('utf8'), filename='categories.csv')
+                        caption = 'Товары успешно отправлены на сайт. Чтобы проставить категорию новым товарам нужно ' \
+                                  f'загрузить CSV-файл ниже на {catalog_url}, ' \
+                                  'иначе они будут без категории.'
+                        await query.message.answer_media_group(
+                            media=[
+                                types.InputMediaPhoto(
+                                    media=types.FSInputFile(
+                                        path=resources.files('vk_to_commerceml.data').joinpath('import_csv_01.png')),
+                                ),
+                                types.InputMediaPhoto(
+                                    media=types.FSInputFile(
+                                        path=resources.files('vk_to_commerceml.data').joinpath('import_csv_02.png')),
+                                ),
+                                types.InputMediaPhoto(
+                                    media=types.FSInputFile(
+                                        path=resources.files('vk_to_commerceml.data').joinpath('import_csv_03.png')),
+                                    caption=caption,
+                                ),
+                            ],
+                        )
+                        await query.message.answer_document(csv_file)
+                    else:
+                        await query.message.answer(f'Товары успешно отправлены на сайт')
                 case SyncState.MAIN_FAILED:
                     await query.message.answer(f'Ошибка отправки товаров на сайт: {content}')
                 case SyncState.PHOTO_SUCCESS:
@@ -80,6 +86,7 @@ async def callback_sync(query: types.CallbackQuery, callback_data: SyncCallback,
                     await query.message.answer(f'Ошибка отправки фото на сайт: {content}')
 
     except Exception as exc:
+        logger.exception('Unexpected sync error: %r', exc)
         await query.message.answer(f'Непредвиденная ошибка: {exc}')
         return
     await query.message.answer(f'Синхронизация завершена за {datetime.now() - started_at}')

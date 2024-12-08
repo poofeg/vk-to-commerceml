@@ -13,7 +13,9 @@ from yarl import URL
 from vk_to_commerceml.infrastructure.cml.models import ImportDocument, OffersDocument
 
 logger = logging.getLogger(__name__)
-RE_FILE_LIMIT = re.compile(r'^file_limit=(\d+)$', re.MULTILINE)
+RE_FILE_LIMIT = re.compile(r'^\s*file_limit\s*=\s*(\d+)\s*$', re.MULTILINE)
+RE_ZIP = re.compile(r'^\s*zip\s*=\s*yes\s*$', re.MULTILINE)
+RE_SUCCESS = re.compile(r'^\s*success')
 
 
 class CmlClientSession:
@@ -37,7 +39,7 @@ class CmlClientSession:
                 await asyncio.sleep(sleep_delay)
                 continue
             break
-        if not result.startswith('success'):
+        if not RE_SUCCESS.match(result):
             raise Exception(result)
 
     async def __file(self, session: ClientSession, filename: str, common_params: dict[str, str],
@@ -60,7 +62,7 @@ class CmlClientSession:
             response.raise_for_status()
             result = (await response.text()).strip()
         logger.info('Response: %s', result)
-        if not result.startswith('success'):
+        if not RE_SUCCESS.match(result):
             raise Exception(result)
 
     async def upload(self, import_document: ImportDocument,
@@ -90,7 +92,7 @@ class CmlClientSession:
                 response_text = await response.text()
             logger.info('Response: %s', response_text)
             zip_bytes = BytesIO()
-            zip_file = ZipFile(zip_bytes, 'w') if 'zip=yes' in response_text else None
+            zip_file = ZipFile(zip_bytes, 'w') if RE_ZIP.search(response_text) else None
             file_limit: int | None = None
             if m := RE_FILE_LIMIT.search(response_text):
                 file_limit = int(m.group(1))

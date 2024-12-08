@@ -1,3 +1,4 @@
+import asyncio
 import io
 import itertools
 import logging
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 RE_FILE_LIMIT = re.compile(r'^\s*file_limit\s*=\s*(\d+)\s*$', re.MULTILINE)
 RE_ZIP = re.compile(r'^\s*zip\s*=\s*yes\s*$', re.MULTILINE)
 RE_SUCCESS = re.compile(r'^\s*success')
+RE_PROGRESS = re.compile(r'^\s*progress\s*(.*)', re.DOTALL)
 
 
 class CmlClientSession:
@@ -35,8 +37,12 @@ class CmlClientSession:
                 response.raise_for_status()
                 result = (await response.text()).strip()
                 logger.info('Response: %s', result)
-            if result.startswith('progress') or 'Too many requests' in result:
+            if 'Too many requests' in result:
                 await asyncio.sleep(sleep_delay)
+                continue
+            if m := RE_PROGRESS.match(result):
+                if not m.group(1):
+                    await asyncio.sleep(sleep_delay)
                 continue
             break
         if not RE_SUCCESS.match(result):

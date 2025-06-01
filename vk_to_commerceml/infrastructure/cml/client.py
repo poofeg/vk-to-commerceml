@@ -16,8 +16,7 @@ from vk_to_commerceml.infrastructure.cml.models import ImportDocument, OffersDoc
 logger = logging.getLogger(__name__)
 RE_FILE_LIMIT = re.compile(r'^\s*file_limit\s*=\s*(\d+)\s*$', re.MULTILINE)
 RE_ZIP = re.compile(r'^\s*zip\s*=\s*yes\s*$', re.MULTILINE)
-RE_SUCCESS = re.compile(r'^\s*success')
-RE_PROGRESS = re.compile(r'^\s*progress\s*(.*)', re.DOTALL)
+RE_STATUS = re.compile(r'^\s*(?P<status>success|failure|progress)\s*(?P<detail>.*)$', re.DOTALL)
 
 
 class CmlClientSession:
@@ -29,6 +28,8 @@ class CmlClientSession:
 
     async def __import(self, session: ClientSession, filename: str, common_params: dict[str, str]) -> None:
         logger.info('CommerceML: import %s', filename)
+        status = 'failure'
+        detail = ''
         for sleep_delay in itertools.count(start=1):
             async with session.get(
                 self.__url,
@@ -37,16 +38,20 @@ class CmlClientSession:
                 response.raise_for_status()
                 result = (await response.text()).strip()
                 logger.info('Response: %s', result)
-            if 'Too many requests' in result:
-                await asyncio.sleep(sleep_delay)
-                continue
-            if m := RE_PROGRESS.match(result):
-                if not m.group(1):
+            if m := RE_STATUS.match(result):
+                status = m.group('status')
+                prev_detail = detail
+                detail = m.group('detail')
+                if 'Too many requests' in detail:
                     await asyncio.sleep(sleep_delay)
-                continue
+                    continue
+                if status == 'progress':
+                    if detail == prev_detail:
+                        await asyncio.sleep(sleep_delay)
+                    continue
             break
-        if not RE_SUCCESS.match(result):
-            raise Exception(result)
+        if status != 'success':
+            raise Exception(detail)
 
     async def __file(self, session: ClientSession, filename: str, common_params: dict[str, str],
                      content_type: str, data: io.BytesIO | bytes, file_limit: int | None = None) -> None:

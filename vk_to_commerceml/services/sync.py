@@ -18,6 +18,7 @@ from vk_to_commerceml.infrastructure.vk.client import VkClient
 RE_PROPERTIES_AREA = re.compile(r'^(.*?)\s*--\s*(.*)$', re.DOTALL)
 RE_PROPERTIES = re.compile(r'^\s*(.*?)\s*:\s*(.*?)\s*$', re.MULTILINE)
 RE_FULL_NAME = re.compile(r'^.*\n\s*(.*)\s*$', re.DOTALL)
+RE_COMMA =  re.compile(r'\s*,\s*', re.DOTALL)
 
 logger = logging.getLogger(__name__)
 
@@ -64,20 +65,23 @@ class SyncService:
             groups.add(Group(id=group_id, name=item.owner_info.category))
             property_values: list[PropertyValue] = []
             description = item.description
+            full_name = ''
             if properties_area_match := RE_PROPERTIES_AREA.match(description):
                 description = properties_area_match.group(1)
                 if properties_found := RE_PROPERTIES.findall(properties_area_match.group(2)):
-                    for name, value in properties_found:
+                    for name, values in properties_found:
                         property_id = name.lower().replace(' ', '_')
                         properties.add(Property(id=property_id, name=name))
-                        property_values.append(PropertyValue(id=property_id, value=value))
+                        if not full_name:
+                            full_name = f'{name} {values}'
+                        for value in RE_COMMA.split(values):
+                            property_values.append(PropertyValue(id=property_id, value=value))
             seo_descr = description.split('\n', maxsplit=1)[0]
             csv_row = {
                 'External ID': external_id,
                 'SEO descr': seo_descr,
             }
-            full_name = ''
-            if full_name_match := RE_FULL_NAME.match(description):
+            if not full_name and (full_name_match := RE_FULL_NAME.match(description)):
                 full_name = full_name_match.group(1)
             video_urls: list[str] = []
             for video in item.videos:

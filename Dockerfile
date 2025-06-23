@@ -1,4 +1,4 @@
-FROM python:3.12-alpine as builder
+FROM python:3.13-alpine as builder
 
 RUN apk add --no-cache build-base libffi-dev
 RUN python -m venv /opt/poetry
@@ -16,7 +16,7 @@ RUN poetry install --no-cache --no-interaction --no-ansi --no-root --without=dev
 COPY vk_to_commerceml vk_to_commerceml
 RUN poetry install --no-cache --no-interaction --no-ansi --without=dev
 
-FROM python:3.12-alpine
+FROM python:3.13-alpine
 
 WORKDIR /app
 COPY --from=build /app /app

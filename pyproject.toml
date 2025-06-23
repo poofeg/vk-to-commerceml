@@ -1,28 +1,32 @@
-[tool.poetry]
+[project]
 name = "vk-to-commerceml"
 version = "0.1.0"
 description = "Telegram bot that can synchronize VK products to a website using the CommerceML protocol"
-authors = ["Alexey Vaganov <poofeg@gmail.com>"]
-license = "MIT"
-repository = "https://github.com/poofeg/vk-to-commerceml"
+authors = [
+    { name = "Alexey Vaganov", email = "poofeg@gmail.com" }
+]
+license = { text = "MIT" }
 readme = "README.md"
+requires-python = ">=3.13,<4.0"
+dependencies = [
+    "aiogram[redis] (>=3.20.0.post0,<4.0.0)",
+    "aiohttp[speedups] (>=3.11.18,<4.0.0)",
+    "cryptography (>=45.0.4,<46.0.0)",
+    "fastapi (>=0.115.13,<0.116.0)",
+    "pydantic (>=2.11.7,<3.0.0)",
+    "pydantic-settings (>=2.10.0,<3.0.0)",
+    "pydantic-xml[lxml] (>=2.17.2,<3.0.0)",
+    "typer[all] (>=0.16.0,<0.17.0)",
+    "uvicorn[standard] (>=0.34.3,<0.35.0)",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-pydantic = "^2.5.3"
-pydantic-xml = {version = "^2.8.1", extras = ["lxml"]}
-pydantic-settings = "^2.2.1"
-typer = {extras = ["all"], version = "^0.9.0"}
-aiohttp = {extras = ["aiodns"], version = "^3.9.3"}
-fastapi = "^0.110.0"
-uvicorn = {extras = ["standard"], version = "^0.27.1"}
-aiogram = {extras = ["redis"], version = "^3.4.1"}
-cryptography = "^42.0.5"
+[project.urls]
+repository = "https://github.com/poofeg/vk-to-commerceml"
 
 [tool.poetry.group.dev.dependencies]
-mypy = {version = "^1.9.0", extras = ["dmypy"]}
-types-aiofiles = "^23.2.0.20240311"
+mypy = {version = "^1.16.1", extras = ["dmypy"]}
+types-aiofiles = "^24.1.0.20250606"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

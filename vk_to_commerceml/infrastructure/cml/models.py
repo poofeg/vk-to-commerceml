@@ -1,10 +1,9 @@
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timezone
 from functools import partial
-from typing import Optional
 
 from pydantic import ConfigDict
-from pydantic_xml import BaseXmlModel, element, wrapped, attr
+from pydantic_xml import BaseXmlModel, attr, element, wrapped
 
 
 class CmlBaseModel(BaseXmlModel):
@@ -13,7 +12,7 @@ class CmlBaseModel(BaseXmlModel):
 
 class CommercialInformation(CmlBaseModel, tag='КоммерческаяИнформация'):
     schema_version: str = attr('ВерсияСхемы', default='2.04')
-    creation_date: datetime = attr('ДатаФормирования', default_factory=partial(datetime.now, timezone.utc))
+    creation_date: datetime = attr('ДатаФормирования', default_factory=partial(datetime.now, UTC))
     syncing_products: bool = attr('СинхронизацияТоваров', default=False)
 
 
@@ -55,14 +54,14 @@ class DetailValue(CmlBaseModel, tag='ЗначениеРеквизита'):
 
 class Product(CmlBaseModel, tag='Товар', skip_empty=True):
     id: str = element(tag='Ид')
-    number: Optional[str] = element(tag='Артикул', default=None)
+    number: str | None = element(tag='Артикул', default=None)
     name: str = element(tag='Наименование')
     base_unit: BaseUnit = BaseUnit()
-    description: Optional[str] = element(tag='Описание', default=None)
+    description: str | None = element(tag='Описание', default=None)
     group_ids: list[str] = wrapped('Группы', element(tag='Ид', default=[]))
     images: list[str] = element(tag='Картинка', default=[])
     property_values: list[PropertyValue] = wrapped('ЗначенияСвойств', default=[])
-    detail_values: list[DetailValue] = wrapped('ЗначенияРеквизитов',  default=[])
+    detail_values: list[DetailValue] = wrapped('ЗначенияРеквизитов', default=[])
 
 
 class Catalog(CmlBaseModel, tag='Каталог'):
@@ -94,11 +93,11 @@ class Price(CmlBaseModel, tag='Цена'):
 
 class Offer(CmlBaseModel, tag='Предложение'):
     id: str = element(tag='Ид')
-    number: Optional[str] = element(tag='Артикул', default=None)
+    number: str | None = element(tag='Артикул', default=None)
     name: str = element(tag='Наименование')
     base_unit: BaseUnit = BaseUnit()
     prices: list[Price] = wrapped('Цены', default=[])
-    quantity: Optional[Decimal] = element(tag='Количество', dafault=None)
+    quantity: Decimal | None = element(tag='Количество', dafault=None)
 
 
 class PackageOfOffers(CmlBaseModel, tag='ПакетПредложений', skip_empty=True):

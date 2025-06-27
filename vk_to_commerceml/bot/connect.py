@@ -1,8 +1,8 @@
 from secrets import token_urlsafe
 
-from aiogram import Router, types, F
+from aiogram import F, Router, types
 from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandStart, CommandObject
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -11,7 +11,7 @@ from pydantic import SecretStr
 from yarl import URL
 
 from vk_to_commerceml.app_state import app_state
-from vk_to_commerceml.bot.models import Site, SITE_DISPLAY_NAMES, SITE_CML_URLS
+from vk_to_commerceml.bot.models import SITE_CML_URLS, SITE_DISPLAY_NAMES, Site
 from vk_to_commerceml.bot.states import Form
 from vk_to_commerceml.settings import settings
 
@@ -97,6 +97,8 @@ async def prompt_cml_url(message: types.Message) -> None:
 
 @router.callback_query(Form.vk_group_selected, SiteCallback.filter())
 async def callback_site(query: types.CallbackQuery, callback_data: SiteCallback, state: FSMContext) -> None:
+    if not query.message:
+        return
     cml_url = SITE_CML_URLS.get(callback_data.name)
     if cml_url:
         await state.update_data(cml_site=callback_data.name, cml_url=cml_url)
@@ -105,7 +107,8 @@ async def callback_site(query: types.CallbackQuery, callback_data: SiteCallback,
         await state.update_data(cml_site=callback_data.name)
         await state.set_state(Form.cml_site_selected)
     await query.answer('Сайт сохранен')
-    await query.message.delete()
+    if isinstance(query.message, types.Message):
+        await query.message.delete()
     await query.message.answer(
         f'Выбран сайт: `{SITE_DISPLAY_NAMES[callback_data.name]}`',
         parse_mode=ParseMode.MARKDOWN_V2
@@ -114,6 +117,7 @@ async def callback_site(query: types.CallbackQuery, callback_data: SiteCallback,
         await prompt_cml_login(message=query.message)
     else:
         await prompt_cml_url(message=query.message)
+
 
 @router.message(Form.vk_group_selected)
 async def select_site(message: types.Message) -> None:
@@ -129,6 +133,8 @@ async def select_site(message: types.Message) -> None:
 
 @router.callback_query(Form.vk_authorized, VkGroupCallback.filter())
 async def callback_vk_group(query: types.CallbackQuery, callback_data: VkGroupCallback, state: FSMContext) -> None:
+    if not query.message:
+        return
     data = await state.get_data()
     vk_token = app_state.secrets.decrypt(data['vk_token'])
     vk_client = await app_state.vk_client.get_session(vk_token)
@@ -140,7 +146,8 @@ async def callback_vk_group(query: types.CallbackQuery, callback_data: VkGroupCa
     await state.update_data(vk_group_id=group.id)
     await state.set_state(Form.vk_group_selected)
     await query.answer('Группа сохранена')
-    await query.message.delete()
+    if isinstance(query.message, types.Message):
+        await query.message.delete()
     await query.message.answer(f'Выбрана группа: `{group.name}`', parse_mode=ParseMode.MARKDOWN_V2)
     await select_site(message=query.message)
 
@@ -172,7 +179,8 @@ async def default_handler(message: types.Message, state: FSMContext) -> None:
     app_state.oauth_request_state_keys[state_code] = state.key
     url = URL(str(settings.base_url)) / 'oauth' / 'redirect' / state_code
     await message.answer(
-        f'Привет, {hbold(message.from_user.full_name)}! Боту нужен доступ к товарам ВК.',
+        f'Привет, {hbold(message.from_user.full_name if message.from_user else "Пользователь")}! '
+        'Боту нужен доступ к товарам ВК.',
         parse_mode='HTML',
         reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[[
             types.InlineKeyboardButton(text='Авторизоваться в ВК', url=str(url)),

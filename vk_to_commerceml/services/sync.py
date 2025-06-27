@@ -1,25 +1,36 @@
-import csv
-import io
 import logging
 import re
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 from pydantic import SecretStr
 
-from vk_to_commerceml.infrastructure.vk import models as vk_models
 from vk_to_commerceml.infrastructure.cml.client import CmlClient
-from vk_to_commerceml.infrastructure.cml.models import CatalogClassifier, Catalog, Product, PropertyValue, \
-    DetailValue, Group, Property, ImportDocument, OffersDocument, PackageOfOffers, Offer, PriceType, Price
+from vk_to_commerceml.infrastructure.cml.models import (
+    Catalog,
+    CatalogClassifier,
+    DetailValue,
+    Group,
+    ImportDocument,
+    Offer,
+    OffersDocument,
+    PackageOfOffers,
+    Price,
+    PriceType,
+    Product,
+    Property,
+    PropertyValue,
+)
+from vk_to_commerceml.infrastructure.vk import models as vk_models
 from vk_to_commerceml.infrastructure.vk.client import VkClient
 from vk_to_commerceml.services.csv_writer import CsvWriter
 
 RE_PROPERTIES_AREA = re.compile(r'^(.*?)\s*--\s*(.*)$', re.DOTALL)
 RE_PROPERTIES = re.compile(r'^\s*(.*?)\s*:\s*(.*?)\s*$', re.MULTILINE)
 RE_FULL_NAME = re.compile(r'^.*\n\s*(.*)\s*$', re.DOTALL)
-RE_COMMA =  re.compile(r'\s*,\s*', re.DOTALL)
+RE_COMMA = re.compile(r'\s*,\s*', re.DOTALL)
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +91,6 @@ class SyncService:
                         for value in RE_COMMA.split(values):
                             property_values.append(PropertyValue(id=property_id, value=value))
             seo_descr = description.split('\n', maxsplit=1)[0]
-            csv_row = {
-                'External ID': external_id,
-                'SEO descr': seo_descr,
-            }
             if not full_name and (full_name_match := RE_FULL_NAME.match(description)):
                 full_name = full_name_match.group(1)
             video_urls: list[str] = []
@@ -93,34 +100,30 @@ class SyncService:
                     f'<a href="{url}" target="_blank">Видео "{video.title}" ({timedelta(seconds=video.duration)})</a>')
             if video_urls:
                 description += '\n\n' + '\n'.join(video_urls)
-            new = item.date > datetime.now(timezone.utc) - timedelta(days=31) if item.date else False
+            new = item.date > datetime.now(UTC) - timedelta(days=31) if item.date else False
+            mark: str | None = None
             if item.availability == vk_models.Availability.PRESENTED:
                 title = item.title
                 if new:
                     group_ids = ['new', group_id] if not skip_multiple_group else []
-                    if csv_writer:
-                        csv_writer.write_row(external_id, categories=['new', group_name], mark='NEW')
-                    csv_row['Mark'] = 'NEW'
-                    csv_row['Category'] = f'new;{group_name}'
+                    categories = ['new', group_name]
+                    mark = 'NEW'
                 else:
                     group_ids = [group_id]
-                    if csv_writer:
-                        csv_writer.write_row(external_id, categories=[group_name])
-                    csv_row['Category'] = group_name
+                    categories = [group_name]
             else:
                 title = f'{item.title} [Продано]'
                 group_ids = ['продано']
-                if csv_writer:
-                    csv_writer.write_row(external_id, categories=['Продано'])
-                csv_row['Category'] = 'Продано'
-            csv_rows.append(csv_row)
+                categories = ['Продано']
+            if csv_writer:
+                csv_writer.write_row(external_id, categories=categories, mark=mark, seo_descr=seo_descr)
             detail_values: list[DetailValue] = [
                 DetailValue(name='SEO descr', value=seo_descr),
             ]
             if full_name:
                 detail_values.append(DetailValue(name='Полное наименование', value=full_name))
-            if new:
-                detail_values.append(DetailValue(name='Mark', value='NEW'))
+            if mark:
+                detail_values.append(DetailValue(name='Mark', value=mark))
             products.append(Product(
                 id=external_id,
                 number=item.sku,

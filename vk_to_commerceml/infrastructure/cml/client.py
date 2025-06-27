@@ -7,7 +7,7 @@ from io import BytesIO
 from typing import cast
 from zipfile import ZipFile
 
-from aiohttp import ClientSession, BasicAuth, hdrs, TCPConnector
+from aiohttp import BasicAuth, ClientSession, TCPConnector, hdrs
 from pydantic import SecretStr
 from yarl import URL
 
@@ -73,7 +73,7 @@ class CmlClientSession:
             response.raise_for_status()
             result = (await response.text()).strip()
         logger.info('Response: %s', result)
-        if not RE_SUCCESS.match(result):
+        if not (m := RE_STATUS.match(result)) or m.group('status') != 'success':
             raise Exception(result)
 
     async def upload(self, import_document: ImportDocument,

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from aiogram import Router, Dispatcher, Bot, types
+from aiogram import Bot, Dispatcher, Router, types
 from aiogram.fsm.storage.redis import RedisStorage
 from redis.asyncio import Redis
 
@@ -19,8 +19,8 @@ task: asyncio.Task[None]
 async def set_bot_commands_menu(my_bot: Bot) -> None:
     # Register commands for Telegram bot (menu)
     commands = [
-        types.BotCommand(command="/sync", description='Запуск синхронизации'),
-        types.BotCommand(command="/logout", description='Сбросить авторизации'),
+        types.BotCommand(command='/sync', description='Запуск синхронизации'),
+        types.BotCommand(command='/logout', description='Сбросить авторизации'),
     ]
     try:
         await my_bot.set_my_commands(commands)

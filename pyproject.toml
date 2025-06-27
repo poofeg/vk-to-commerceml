@@ -26,7 +26,38 @@ repository = "https://github.com/poofeg/vk-to-commerceml"
 [tool.poetry.group.dev.dependencies]
 mypy = {version = "^1.16.1", extras = ["dmypy"]}
 types-aiofiles = "^24.1.0.20250606"
+ruff = "^0.12.1"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "single"
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+preview = true
+select = [
+    "E",
+    "F",
+    "I",
+    "Q",
+    "UP",
+    "W",
+]
+
+[tool.mypy]
+plugins = ["pydantic_xml.mypy"]
+python_version = "3.13"
+platform = "linux"
+follow_imports = "normal"
+ignore_missing_imports = false
+mypy_path = "stubs"
+strict = true

@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from importlib import resources
 
-from aiogram import F, types, Router
+from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
@@ -25,6 +25,8 @@ class SyncCallback(CallbackData, prefix='sync'):
 
 @router.callback_query(Form.cml_password_entered, SyncCallback.filter(F.start))
 async def callback_sync(query: types.CallbackQuery, callback_data: SyncCallback, state: FSMContext) -> None:
+    if not query.message:
+        return
     started_at = datetime.now()
     data = await state.get_data()
     vk_token = app_state.secrets.decrypt(data['vk_token'])
@@ -52,32 +54,40 @@ async def callback_sync(query: types.CallbackQuery, callback_data: SyncCallback,
                 case SyncState.GET_PRODUCTS_FAILED:
                     await query.message.answer(f'Ошибка получения товаров из ВК: {content}')
                 case SyncState.MAIN_SUCCESS:
-                    if content:
+                    if content and isinstance(content, str):
                         catalog_url = SITE_CATALOG_URLS[data['cml_site']].format(login=cml_login)
                         csv_file = types.BufferedInputFile(content.encode('utf8'), filename='categories.csv')
                         caption = 'Товары успешно отправлены на сайт. Чтобы проставить категорию новым товарам нужно ' \
                                   f'загрузить CSV-файл ниже на {catalog_url}, ' \
                                   'иначе они будут без категории.'
+
+                        files = resources.files('vk_to_commerceml.data')
                         await query.message.answer_media_group(
                             media=[
                                 types.InputMediaPhoto(
-                                    media=types.FSInputFile(
-                                        path=resources.files('vk_to_commerceml.data').joinpath('import_csv_01.png')),
+                                    media=types.BufferedInputFile(
+                                        file=files.joinpath('import_csv_01.png').read_bytes(),
+                                        filename='import_csv_01.png',
+                                    ),
                                 ),
                                 types.InputMediaPhoto(
-                                    media=types.FSInputFile(
-                                        path=resources.files('vk_to_commerceml.data').joinpath('import_csv_02.png')),
+                                    media=types.BufferedInputFile(
+                                        file=files.joinpath('import_csv_02.png').read_bytes(),
+                                        filename='import_csv_02.png',
+                                    ),
                                 ),
                                 types.InputMediaPhoto(
-                                    media=types.FSInputFile(
-                                        path=resources.files('vk_to_commerceml.data').joinpath('import_csv_03.png')),
+                                    media=types.BufferedInputFile(
+                                        file=files.joinpath('import_csv_03.png').read_bytes(),
+                                        filename='import_csv_03.png',
+                                    ),
                                     caption=caption,
                                 ),
                             ],
                         )
                         await query.message.answer_document(csv_file)
                     else:
-                        await query.message.answer(f'Товары успешно отправлены на сайт')
+                        await query.message.answer('Товары успешно отправлены на сайт')
                 case SyncState.MAIN_FAILED:
                     await query.message.answer(f'Ошибка отправки товаров на сайт: {content}')
                 case SyncState.PHOTO_SUCCESS:

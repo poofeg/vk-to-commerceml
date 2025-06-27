@@ -18,6 +18,7 @@ from vk_to_commerceml.infrastructure.vk.client import VkClient
 RE_PROPERTIES_AREA = re.compile(r'^(.*?)\s*--\s*(.*)$', re.DOTALL)
 RE_PROPERTIES = re.compile(r'^\s*(.*?)\s*:\s*(.*?)\s*$', re.MULTILINE)
 RE_FULL_NAME = re.compile(r'^.*\n\s*(.*)\s*$', re.DOTALL)
+RE_COMMA =  re.compile(r'\s*,\s*', re.DOTALL)
 
 logger = logging.getLogger(__name__)
 
@@ -64,15 +65,23 @@ class SyncService:
             groups.add(Group(id=group_id, name=item.owner_info.category))
             property_values: list[PropertyValue] = []
             description = item.description
+            full_name = ''
             if properties_area_match := RE_PROPERTIES_AREA.match(description):
                 description = properties_area_match.group(1)
                 if properties_found := RE_PROPERTIES.findall(properties_area_match.group(2)):
-                    for name, value in properties_found:
+                    for name, values in properties_found:
                         property_id = name.lower().replace(' ', '_')
                         properties.add(Property(id=property_id, name=name))
-                        property_values.append(PropertyValue(id=property_id, value=value))
-            full_name = ''
-            if full_name_match := RE_FULL_NAME.match(description):
+                        if not full_name:
+                            full_name = f'{name} {values}'
+                        for value in RE_COMMA.split(values):
+                            property_values.append(PropertyValue(id=property_id, value=value))
+            seo_descr = description.split('\n', maxsplit=1)[0]
+            csv_row = {
+                'External ID': external_id,
+                'SEO descr': seo_descr,
+            }
+            if not full_name and (full_name_match := RE_FULL_NAME.match(description)):
                 full_name = full_name_match.group(1)
             video_urls: list[str] = []
             for video in item.videos:
@@ -83,16 +92,22 @@ class SyncService:
                 description += '\n\n' + '\n'.join(video_urls)
             new = item.date > datetime.now(timezone.utc) - timedelta(days=31) if item.date else False
             if item.availability == vk_models.Availability.PRESENTED:
+                title = item.title
                 if new:
                     group_ids = ['new', group_id] if not skip_multiple_group else []
-                    csv_rows.append({'External ID': external_id, 'Mark': 'NEW', 'Category': f'new;{group_name}'})
+                    csv_row['Mark'] = 'NEW'
+                    csv_row['Category'] = f'new;{group_name}'
                 else:
                     group_ids = [group_id]
-                    csv_rows.append({'External ID': external_id, 'Mark': '', 'Category': group_name})
+                    csv_row['Category'] = group_name
             else:
+                title = f'{item.title} [Продано]'
                 group_ids = ['продано']
-                csv_rows.append({'External ID': external_id, 'Mark': '', 'Category': 'Продано'})
-            detail_values: list[DetailValue] = []
+                csv_row['Category'] = 'Продано'
+            csv_rows.append(csv_row)
+            detail_values: list[DetailValue] = [
+                DetailValue(name='SEO descr', value=seo_descr),
+            ]
             if full_name:
                 detail_values.append(DetailValue(name='Полное наименование', value=full_name))
             if new:
@@ -100,7 +115,7 @@ class SyncService:
             products.append(Product(
                 id=external_id,
                 number=item.sku,
-                name=item.title,
+                name=title,
                 description=description,
                 group_ids=group_ids,
                 images=[],
@@ -110,7 +125,7 @@ class SyncService:
             offers.append(Offer(
                 id=external_id,
                 number=item.sku,
-                name=item.title,
+                name=title,
                 prices=[
                     Price(price_type_id='sale_price', unit_price=item.price.old_amount / Decimal(100)),
                     Price(price_type_id='discount_price', unit_price=item.price.amount / Decimal(100))
@@ -121,7 +136,10 @@ class SyncService:
             ))
 
         csv_file = io.StringIO(newline='')
-        writer = csv.DictWriter(csv_file, fieldnames=['External ID', 'Mark', 'Category', 'Parent UID'])
+        writer = csv.DictWriter(
+            csv_file,
+            fieldnames=['External ID', 'Mark', 'Category', 'Parent UID', 'SEO descr', 'SEO keywords']
+        )
         writer.writeheader()
         writer.writerows(csv_rows)
 

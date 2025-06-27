@@ -4,11 +4,12 @@ import logging
 import os.path
 from asyncio import Task
 from operator import attrgetter
+from types import SimpleNamespace
 from typing import Any, TypeVar
 
 import aiofiles
 import aiofiles.os
-from aiohttp import ClientSession, hdrs
+from aiohttp import ClientSession, DummyCookieJar, TraceConfig, hdrs, tracing
 from aiohttp.client_reqrep import json_re
 from pydantic import SecretStr, ValidationError
 from yarl import URL
@@ -149,9 +150,26 @@ class VkClientSession:
 
 class VkClient:
     def __init__(self) -> None:
-        self.__session = ClientSession()
+        trace_config = TraceConfig()
+        trace_config.on_request_end.append(self.__on_request_end)
+        self.__session = ClientSession(
+            cookie_jar=DummyCookieJar(),
+            trace_configs=[trace_config]
+        )
         self.__context_tmp_dir = contextlib.AsyncExitStack()
         self.__tmp_dir: str | None = None
+
+    @staticmethod
+    async def __on_request_end(
+        session: ClientSession, context: SimpleNamespace, params: tracing.TraceRequestEndParams
+    ) -> None:
+        logger.info(
+            '%d %s on %s %s',
+            params.response.status,
+            params.response.reason,
+            params.method,
+            params.url
+        )
 
     async def close(self) -> None:
         await self.__session.close()

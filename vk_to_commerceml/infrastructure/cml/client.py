@@ -92,7 +92,7 @@ class CmlClientSession:
                 auth_response = (await response.text()).splitlines()
             logger.info('Response: %s', auth_response)
             if not auth_response or auth_response[0].startswith('failure'):
-                raise Exception('Auth error')
+                raise Exception('\n'.join(auth_response[1:]) or 'Auth error')
             common_params = {'type': 'catalog'}
             if len(auth_response) >= 4 and auth_response[3].startswith('sessid='):
                 common_params['sessid'] = auth_response[3].removeprefix('sessid=')

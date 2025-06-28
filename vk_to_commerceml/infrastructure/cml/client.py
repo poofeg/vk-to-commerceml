@@ -94,37 +94,54 @@ class CmlClientSession:
         if not (m := RE_STATUS.match(result)) or m.group('status') != 'success':
             raise Exception(result)
 
+    async def __check_auth(self, session: ClientSession) -> str | None:
+        logger.info(
+            'CommerceML: checkauth, url: %s, login: %s, password: %s', self.__url, self.__login, self.__password
+        )
+        async with session.get(
+            self.__url,
+            params={'type': 'catalog', 'mode': 'checkauth'},
+            auth=BasicAuth(login=self.__login, password=self.__password.get_secret_value(), encoding='utf8'),
+        ) as response:
+            response.raise_for_status()
+            auth_response = (await response.text()).splitlines()
+        logger.info('Response: %s', auth_response)
+        if not auth_response or auth_response[0].startswith('failure'):
+            raise Exception('\n'.join(auth_response[1:]) or 'Auth error')
+        if len(auth_response) >= 4 and auth_response[3].startswith('sessid='):
+            return auth_response[3].removeprefix('sessid=')
+        return None
+
+    async def __init(self, session: ClientSession, common_params: dict[str, str]) -> tuple[bool, int | None]:
+        logger.info('CommerceML: init')
+        async with session.get(self.__url, params={**common_params, 'mode': 'init'}) as response:
+            response.raise_for_status()
+            response_text = await response.text()
+        logger.info('Response: %s', response_text)
+        zip_yes = bool(RE_ZIP.search(response_text))
+        file_limit: int | None = None
+        if m := RE_FILE_LIMIT.search(response_text):
+            file_limit = int(m.group(1))
+        return zip_yes, file_limit
+
+    async def check_auth(self) -> None:
+        async with ClientSession(connector=self.__connector, connector_owner=False) as session:
+            await self.__check_auth(session)
+
     async def upload(self, import_document: ImportDocument,
                      offers_document: OffersDocument | None = None,
                      photos: dict[str, bytes] | None = None) -> None:
         async with ClientSession(connector=self.__connector, connector_owner=False) as session:
-            logger.info(
-                'CommerceML: checkauth, url: %s, login: %s, password: %s', self.__url, self.__login, self.__password
-            )
-            async with session.get(
-                self.__url,
-                params={'type': 'catalog', 'mode': 'checkauth'},
-                auth=BasicAuth(login=self.__login, password=self.__password.get_secret_value(), encoding='utf8'),
-            ) as response:
-                response.raise_for_status()
-                auth_response = (await response.text()).splitlines()
-            logger.info('Response: %s', auth_response)
-            if not auth_response or auth_response[0].startswith('failure'):
-                raise Exception('\n'.join(auth_response[1:]) or 'Auth error')
-            common_params = {'type': 'catalog'}
-            if len(auth_response) >= 4 and auth_response[3].startswith('sessid='):
-                common_params['sessid'] = auth_response[3].removeprefix('sessid=')
+            sessid = await self.__check_auth(session)
 
-            logger.info('CommerceML: init')
-            async with session.get(self.__url, params={**common_params, 'mode': 'init'}) as response:
-                response.raise_for_status()
-                response_text = await response.text()
-            logger.info('Response: %s', response_text)
-            zip_bytes = BytesIO()
-            zip_file = ZipFile(zip_bytes, 'w') if RE_ZIP.search(response_text) else None
-            file_limit: int | None = None
-            if m := RE_FILE_LIMIT.search(response_text):
-                file_limit = int(m.group(1))
+            common_params = {'type': 'catalog'}
+            if sessid:
+                common_params['sessid'] = sessid
+
+            zip_yes, file_limit = await self.__init(session, common_params)
+            if zip_yes:
+                zip_bytes = BytesIO()
+                zip_file = ZipFile(zip_bytes, 'w')
 
             if photos:
                 for photo_name, photo_data in photos.items():
@@ -142,7 +159,7 @@ class CmlClientSession:
                         )
 
             import_xml = cast(bytes, import_document.to_xml(pretty_print=True, encoding='UTF-8', standalone=True))
-            if zip_file:
+            if zip_yes:
                 logger.info('Add file to zip: import.xml')
                 zip_file.writestr('import.xml', import_xml)
             else:
@@ -157,7 +174,7 @@ class CmlClientSession:
 
             if offers_document:
                 offers_xml = cast(bytes, offers_document.to_xml(pretty_print=True, encoding='UTF-8', standalone=True))
-                if zip_file:
+                if zip_yes:
                     logger.info('Add file to zip: offers.xml')
                     zip_file.writestr('offers.xml', offers_xml)
                 else:
@@ -170,7 +187,7 @@ class CmlClientSession:
                         file_limit=file_limit,
                     )
 
-            if zip_file:
+            if zip_yes:
                 zip_file.close()
                 zip_bytes.seek(0)
                 await self.__file(

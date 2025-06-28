@@ -1,4 +1,5 @@
 #!/bin/sh
 set -e
 
+ruff check vk_to_commerceml
 mypy vk_to_commerceml

@@ -1,7 +1,7 @@
 import logging
 import os.path
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 import aiofiles
@@ -21,7 +21,7 @@ class DebugFileSaver:
         path = os.path.join(self.__base_path, str(uuid.uuid4()))
         await aiofiles.os.makedirs(path, exist_ok=True)
         self.__target_dir = os.path.abspath(path)
-        logger.info(f"CML upload debug dir created: {self.__target_dir:}")
+        logger.info(f'CML upload debug dir created: {self.__target_dir:}')
 
     async def save_file(self, filename: str, data: bytes | str) -> None:
         if not self.__target_dir:

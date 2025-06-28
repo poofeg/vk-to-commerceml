@@ -50,9 +50,20 @@ async def enter_cml_password(message: types.Message, state: FSMContext) -> None:
         return
     password = SecretStr(message.text.strip())
     await state.update_data(cml_password=app_state.secrets.encrypt(password))
-    await state.set_state(Form.cml_password_entered)
     await message.delete()
     await message.answer('Пароль CommerceML сохранен')
+    await message.answer('Проверка доступа к CommerceML...')
+    url = await state.get_value('cml_url', '')
+    login = await state.get_value('cml_login', '')
+    cml_client_session = await app_state.cml_client.get_session(url, login, password)
+    try:
+        await cml_client_session.check_auth()
+    except Exception as exc:
+        await message.answer(f'Ошибка: {exc}')
+        await state.set_state(Form.vk_group_selected)
+        await select_site(message=message)
+        return
+    await state.set_state(Form.cml_password_entered)
     await message.answer('Настройка успешно завершена')
     await default_authorized_handler(message=message)
 

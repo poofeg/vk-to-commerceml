@@ -9,6 +9,7 @@ services:
       VK__CLIENT_SECRET:
       REDIS_URL: redis://redis/0
       ENCRYPTION_KEY:
+      CML_DEBUG_BASE_PATH:
 
     depends_on:
       - redis

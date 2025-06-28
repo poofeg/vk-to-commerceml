@@ -4,6 +4,7 @@ import itertools
 import logging
 import re
 from io import BytesIO
+from pathlib import Path
 from typing import cast
 from zipfile import ZipFile
 
@@ -11,6 +12,7 @@ from aiohttp import BasicAuth, ClientSession, TCPConnector, hdrs
 from pydantic import SecretStr
 from yarl import URL
 
+from vk_to_commerceml.infrastructure.cml.debug_file_saver import DebugFileSaver
 from vk_to_commerceml.infrastructure.cml.models import ImportDocument, OffersDocument
 
 logger = logging.getLogger(__name__)
@@ -20,11 +22,15 @@ RE_STATUS = re.compile(r'^\s*(?P<status>success|failure|progress)\s*(?P<detail>.
 
 
 class CmlClientSession:
-    def __init__(self, connector: TCPConnector, url: str, login: str, password: SecretStr) -> None:
+    def __init__(
+        self, connector: TCPConnector, url: str, login: str, password: SecretStr,
+        debug_file_saver: DebugFileSaver
+    ) -> None:
         self.__url = URL(url)
         self.__login = login
         self.__password = password
         self.__connector = connector
+        self.__debug_file_saver = debug_file_saver
 
     async def __import(self, session: ClientSession, filename: str, common_params: dict[str, str]) -> None:
         logger.info('CommerceML: import %s', filename)
@@ -55,15 +61,27 @@ class CmlClientSession:
 
     async def __file(self, session: ClientSession, filename: str, common_params: dict[str, str],
                      content_type: str, data: io.BytesIO | bytes, file_limit: int | None = None) -> None:
+        if isinstance(data, io.BytesIO):
+            data_bytes = data.getvalue()
+        else:
+            data_bytes = data
+
+        if not content_type.startswith('image/'):
+            await self.__debug_file_saver.save_file(filename, data_bytes)
+
         if file_limit:
-            if isinstance(data, io.BytesIO):
-                for chunk in itertools.batched(data.getbuffer(), file_limit):
-                    await self.__file(session, filename, common_params, content_type, bytes(chunk))
-            else:
-                for chunk in itertools.batched(data, file_limit):
-                    await self.__file(session, filename, common_params, content_type, bytes(chunk))
-            return
-        logger.info('CommerceML: file %s', filename)
+            for chunk_number, chunk in enumerate(itertools.batched(data_bytes, file_limit)):
+                await self.__upload_file_chunk(
+                    session, filename, common_params, content_type, bytes(chunk), chunk_number
+                )
+        else:
+            await self.__upload_file_chunk(session, filename, common_params, content_type, data_bytes)
+
+    async def __upload_file_chunk(
+        self, session: ClientSession, filename: str, common_params: dict[str, str],
+        content_type: str, data: bytes, chunk_number: int = 0
+    ) -> None:
+        logger.info('CommerceML: file %s, chunk number: %s', filename, chunk_number)
         async with session.post(
             self.__url,
             params={**common_params, 'mode': 'file', 'filename': filename},
@@ -171,11 +189,14 @@ class CmlClientSession:
 
 
 class CmlClient:
-    def __init__(self) -> None:
+    def __init__(self, debug_base_path: Path | None = None) -> None:
         self.__connector = TCPConnector()
+        self.__debug_base_path = debug_base_path
 
     async def close(self) -> None:
         await self.__connector.close()
 
     async def get_session(self, url: str, login: str, password: SecretStr) -> CmlClientSession:
-        return CmlClientSession(self.__connector, url, login, password)
+        debug_file_saver = DebugFileSaver(self.__debug_base_path)
+        await debug_file_saver.create_dir()
+        return CmlClientSession(self.__connector, url, login, password, debug_file_saver)

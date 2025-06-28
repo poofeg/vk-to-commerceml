@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseModel, HttpUrl, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +16,7 @@ class Settings(BaseSettings):
     vk: Vk
     redis_url: RedisDsn = RedisDsn('redis://')
     encryption_key: bytes = b'change_me'
+    cml_debug_base_path: Path | None = None
 
     model_config = SettingsConfigDict(
         env_nested_delimiter='__',

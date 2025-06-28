@@ -118,12 +118,12 @@ class SyncService:
             if csv_writer:
                 csv_writer.write_row(external_id, categories=categories, mark=mark, seo_descr=seo_descr)
             detail_values: list[DetailValue] = [
-                DetailValue(name='SEO descr', value=seo_descr),
+                DetailValue(name='SEO описание', value=seo_descr),
             ]
             if full_name:
                 detail_values.append(DetailValue(name='Полное наименование', value=full_name))
             if mark:
-                detail_values.append(DetailValue(name='Mark', value=mark))
+                detail_values.append(DetailValue(name='Отметка на карточке', value=mark))
             products.append(Product(
                 id=external_id,
                 number=item.sku,

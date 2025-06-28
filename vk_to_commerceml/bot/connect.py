@@ -1,3 +1,4 @@
+from importlib import resources
 from secrets import token_urlsafe
 
 from aiogram import F, Router, types
@@ -113,6 +114,22 @@ async def callback_site(query: types.CallbackQuery, callback_data: SiteCallback,
         f'Выбран сайт: `{SITE_DISPLAY_NAMES[callback_data.name]}`',
         parse_mode=ParseMode.MARKDOWN_V2
     )
+    if callback_data.name == Site.TILDA:
+        files = resources.files('vk_to_commerceml.data')
+        await query.message.answer_media_group(
+            media=[
+                types.InputMediaPhoto(
+                    media=types.BufferedInputFile(
+                        file=files.joinpath('connect_tilda_01.png').read_bytes(),
+                        filename='import_csv_03.png',
+                    ),
+                    caption='Необходимо перейти в [Каталог товаров](https://store.tilda.ru/), '
+                            'открыть "Синхронизация через CommerceML", настроить "Параметры импорта товаров" в разделе '
+                            '"Дополнительные настройки" и включить синхронизацию\\.',
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                ),
+            ],
+        )
     if cml_url:
         await prompt_cml_login(message=query.message)
     else:

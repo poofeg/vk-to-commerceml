@@ -129,7 +129,6 @@ class VkClientSession:
                     return name, await cache_file.read()
             async with self.__session.get(url) as response:
                 response.raise_for_status()
-                logger.info('Photo downloaded: %s', response.url)
                 data = await response.read()
                 async with aiofiles.open(cache_path, 'wb') as cache_file:
                     await cache_file.write(data)

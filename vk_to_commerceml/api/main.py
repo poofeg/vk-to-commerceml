@@ -21,7 +21,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     logging.basicConfig(level=logging.INFO)
     logger.info('🚀 Starting application')
     app_state.vk_client = VkClient()
-    app_state.cml_client = CmlClient()
+    app_state.cml_client = CmlClient(settings.cml_debug_base_path)
     app_state.secrets = Secrets(settings.encryption_key)
     await start_telegram()
     yield

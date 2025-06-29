@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import IntEnum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, HttpUrl
 
@@ -17,7 +17,7 @@ class GroupItem(VkBaseModel):
 
 class Price(VkBaseModel):
     amount: Decimal
-    old_amount: Optional[Decimal] = None
+    old_amount: Decimal | None = None
 
 
 class Category(VkBaseModel):
@@ -63,7 +63,7 @@ class MarketItem(VkBaseModel):
     photos: list[Photo] = []
     videos: list[Video] = []
     owner_info: OwnerInfo
-    date: datetime = None
+    date: datetime | None = None
 
 
 class GroupsGetResponse(VkBaseModel):

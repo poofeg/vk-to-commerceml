@@ -4,17 +4,26 @@ import logging
 import os.path
 from asyncio import Task
 from operator import attrgetter
-from typing import Optional, Union, Any, TypeVar, Type
+from types import SimpleNamespace
+from typing import Any, TypeVar
 
 import aiofiles
 import aiofiles.os
-from aiohttp import ClientSession, hdrs
+from aiohttp import ClientSession, DummyCookieJar, TraceConfig, hdrs, tracing
 from aiohttp.client_reqrep import json_re
-from pydantic import ValidationError, SecretStr
+from pydantic import SecretStr, ValidationError
 from yarl import URL
 
-from vk_to_commerceml.infrastructure.vk.models import MarketGetRoot, Photo, MarketItem, ErrorResponse, VkBaseModel, \
-    MarketEditRoot, GroupsGetRoot, GroupItem
+from vk_to_commerceml.infrastructure.vk.models import (
+    ErrorResponse,
+    GroupItem,
+    GroupsGetRoot,
+    MarketEditRoot,
+    MarketGetRoot,
+    MarketItem,
+    Photo,
+    VkBaseModel,
+)
 
 logger = logging.getLogger(__name__)
 OAUTH_URL = URL('https://oauth.vk.com/authorize')
@@ -28,7 +37,7 @@ class VkClientSession:
         self.__access_token = access_token
         self.__tmp_dir = tmp_dir
 
-    async def __request(self, response_model: Type[T_VkBaseModel], method: str, url: Union[str, URL],
+    async def __request(self, response_model: type[T_VkBaseModel], method: str, url: str | URL,
                         **kwargs: Any) -> T_VkBaseModel:
         async with self.__session.request(method, url, **kwargs) as response:
             response.raise_for_status()
@@ -83,7 +92,7 @@ class VkClientSession:
             page_number += 1
         return result
 
-    async def get_market_product_by_id(self, owner_id: int, item_id: int) -> Optional[MarketItem]:
+    async def get_market_product_by_id(self, owner_id: int, item_id: int) -> MarketItem | None:
         url = VK_URL / 'market.getById'
         params: dict[str, str] = {
             'access_token': self.__access_token.get_secret_value(),
@@ -112,7 +121,7 @@ class VkClientSession:
         )
         return bool(root.response)
 
-    async def download_photos(self, photos: list[Photo], max_width: Optional[int] = None) -> dict[str, bytes]:
+    async def download_photos(self, photos: list[Photo], max_width: int | None = None) -> dict[str, bytes]:
         async def download_single(name: str, url: str) -> tuple[str, bytes]:
             cache_path = os.path.join(self.__tmp_dir, name)
             if await aiofiles.os.path.exists(cache_path):
@@ -120,12 +129,11 @@ class VkClientSession:
                     return name, await cache_file.read()
             async with self.__session.get(url) as response:
                 response.raise_for_status()
-                logger.info('Photo downloaded: %s', response.url)
                 data = await response.read()
                 async with aiofiles.open(cache_path, 'wb') as cache_file:
                     await cache_file.write(data)
                 return name, await response.read()
-        tasks: list[Task] = []
+        tasks: list[Task[tuple[str, bytes]]] = []
         async with asyncio.TaskGroup() as tg:
             for photo in photos:
                 name = f'vk_{photo.id}.jpg'
@@ -141,9 +149,26 @@ class VkClientSession:
 
 class VkClient:
     def __init__(self) -> None:
-        self.__session = ClientSession()
+        trace_config = TraceConfig()
+        trace_config.on_request_end.append(self.__on_request_end)
+        self.__session = ClientSession(
+            cookie_jar=DummyCookieJar(),
+            trace_configs=[trace_config]
+        )
         self.__context_tmp_dir = contextlib.AsyncExitStack()
         self.__tmp_dir: str | None = None
+
+    @staticmethod
+    async def __on_request_end(
+        session: ClientSession, context: SimpleNamespace, params: tracing.TraceRequestEndParams
+    ) -> None:
+        logger.info(
+            '%d %s on %s %s',
+            params.response.status,
+            params.response.reason,
+            params.method,
+            params.url
+        )
 
     async def close(self) -> None:
         await self.__session.close()

@@ -145,7 +145,7 @@ class CmlClientSession:
 
             if photos:
                 for photo_name, photo_data in photos.items():
-                    if zip_file:
+                    if zip_yes:
                         logger.info('Add file to zip: %s', photo_name)
                         zip_file.writestr(photo_name, photo_data)
                     else:

@@ -67,7 +67,7 @@ class VkClientSession:
 
     async def get_market(self, owner_id: int, with_disabled: bool) -> list[MarketItem]:
         url = VK_URL / 'market.get'
-        page_size = 200
+        page_size = 100
         common_params: dict[str, str] = {
             'access_token': self.__access_token.get_secret_value(),
             'owner_id': str(owner_id),
@@ -188,9 +188,12 @@ class VkClient:
         return SecretStr(data['access_token'])
 
     async def get_session(self, access_token: SecretStr) -> VkClientSession:
+        tmp_dir: str
         if not self.__tmp_dir:
-            self.__tmp_dir = await self.__context_tmp_dir.enter_async_context(
+            tmp_dir = self.__tmp_dir = await self.__context_tmp_dir.enter_async_context(
                 aiofiles.tempfile.TemporaryDirectory()
             )
-            logger.info('Created temp directory: %s', self.__tmp_dir)
-        return VkClientSession(self.__session, access_token, self.__tmp_dir)
+            logger.info('Created temp directory: %s', tmp_dir)
+        else:
+            tmp_dir = self.__tmp_dir
+        return VkClientSession(self.__session, access_token, tmp_dir)

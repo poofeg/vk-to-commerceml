@@ -26,7 +26,6 @@ from vk_to_commerceml.infrastructure.vk.models import (
 )
 
 logger = logging.getLogger(__name__)
-OAUTH_URL = URL('https://oauth.vk.com/authorize')
 VK_URL = URL('https://api.vk.com/method')
 T_VkBaseModel = TypeVar('T_VkBaseModel', bound=VkBaseModel)
 
@@ -67,7 +66,7 @@ class VkClientSession:
 
     async def get_market(self, owner_id: int, with_disabled: bool) -> list[MarketItem]:
         url = VK_URL / 'market.get'
-        page_size = 100
+        page_size = 50
         common_params: dict[str, str] = {
             'access_token': self.__access_token.get_secret_value(),
             'owner_id': str(owner_id),
@@ -175,17 +174,23 @@ class VkClient:
         await self.__context_tmp_dir.aclose()
 
     async def get_access_token(self, client_id: str, client_secret: SecretStr, redirect_uri: str,
-                               code: str) -> SecretStr:
-        params: dict[str, str] = {
+                               code: str, verifier: str, device_id: str, state: str) -> SecretStr:
+        data: dict[str, str] = {
+            'grant_type': 'authorization_code',
             'client_id': client_id,
             'client_secret': client_secret.get_secret_value(),
             'redirect_uri': redirect_uri,
             'code': code,
+            'code_verifier': verifier,
+            'device_id': device_id,
+            'state': state,
         }
-        async with self.__session.post('https://oauth.vk.com/access_token', params=params) as response:
+        async with self.__session.post('https://id.vk.ru/oauth2/auth', data=data) as response:
             response.raise_for_status()
-            data = await response.json()
-        return SecretStr(data['access_token'])
+            response_data = await response.json()
+        if 'error' in response_data:
+            raise Exception(response_data['error'], response_data.get('error_description'))
+        return SecretStr(response_data['access_token'])
 
     async def get_session(self, access_token: SecretStr) -> VkClientSession:
         tmp_dir: str

@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 RUN apk add --no-cache build-base libffi-dev
 RUN python -m venv /opt/poetry
@@ -20,7 +20,7 @@ FROM builder AS tests
 RUN poetry install --no-cache --no-interaction --no-ansi
 CMD ["./run-tests"]
 
-FROM python:3.13-alpine
+FROM python:3.14-alpine
 
 WORKDIR /app
 COPY --from=build /app /app

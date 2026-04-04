@@ -26,7 +26,7 @@ from vk_to_commerceml.infrastructure.vk.models import (
 )
 
 logger = logging.getLogger(__name__)
-VK_URL = URL('https://api.vk.com/method')
+VK_URL = URL('https://api.vk.ru/method')
 T_VkBaseModel = TypeVar('T_VkBaseModel', bound=VkBaseModel)
 
 
@@ -38,7 +38,10 @@ class VkClientSession:
 
     async def __request(self, response_model: type[T_VkBaseModel], method: str, url: str | URL,
                         **kwargs: Any) -> T_VkBaseModel:
-        async with self.__session.request(method, url, **kwargs) as response:
+        headers: dict[str, str] = {
+            hdrs.AUTHORIZATION: f'Bearer {self.__access_token.get_secret_value()}',
+        }
+        async with self.__session.request(method, url, headers=headers, **kwargs) as response:
             response.raise_for_status()
             content_type = response.content_type
             if json_re.match(content_type) is None:
@@ -54,7 +57,6 @@ class VkClientSession:
     async def get_groups(self) -> list[GroupItem]:
         url = VK_URL / 'groups.get'
         params: dict[str, str] = {
-            'access_token': self.__access_token.get_secret_value(),
             'extended': '1',
             'filter': 'advertiser',
             'v': '5.199',
@@ -68,7 +70,6 @@ class VkClientSession:
         url = VK_URL / 'market.get'
         page_size = 50
         common_params: dict[str, str] = {
-            'access_token': self.__access_token.get_secret_value(),
             'owner_id': str(owner_id),
             'count': str(page_size),
             'extended': '1',
@@ -94,7 +95,6 @@ class VkClientSession:
     async def get_market_product_by_id(self, owner_id: int, item_id: int) -> MarketItem | None:
         url = VK_URL / 'market.getById'
         params: dict[str, str] = {
-            'access_token': self.__access_token.get_secret_value(),
             'item_ids': f'{owner_id}_{item_id}',
             'extended': '1',
             'v': '5.199',
@@ -108,7 +108,6 @@ class VkClientSession:
     async def edit_market_item(self, owner_id: int, item_id: int, description: str) -> bool:
         url = VK_URL / 'market.edit'
         data: dict[str, str] = {
-            'access_token': self.__access_token.get_secret_value(),
             'owner_id': str(owner_id),
             'item_id': str(item_id),
             'description': description,

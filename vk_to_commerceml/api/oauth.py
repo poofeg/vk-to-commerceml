@@ -24,9 +24,9 @@ async def oauth_callback(
 ) -> RedirectResponse:
     bot_info = await bot.me()
     assert bot_info.username
-    if state not in app_state.oauth_request_state_keys:
+    key = await app_state.oauth_request_state_keys.get(state, delete=True)
+    if not key:
         return RedirectResponse(url=create_telegram_link(bot_info.username, start='auth_fail'), status_code=303)
-    key = app_state.oauth_request_state_keys.pop(state)
     bot_state = await app_state.bot_storage.get_state(key)
     verifier = await app_state.bot_storage.get_value(key, 'vk_oauth_verifier')
     if not verifier:
@@ -58,9 +58,9 @@ async def oauth_callback(
 async def redirect(state: str) -> RedirectResponse:
     bot_info = await bot.me()
     assert bot_info.username
-    if state not in app_state.oauth_request_state_keys:
+    key = await app_state.oauth_request_state_keys.get(state)
+    if not key:
         return RedirectResponse(url=create_telegram_link(bot_info.username, start='auth_fail'), status_code=303)
-    key = app_state.oauth_request_state_keys[state]
     bot_state = await app_state.bot_storage.get_state(key)
     if bot_state == Form.vk_start:
         url, verifier = get_authorization_url(settings.vk.client_id, str(settings.vk.oauth_callback_url), state)
@@ -70,5 +70,5 @@ async def redirect(state: str) -> RedirectResponse:
             status_code=303,
         )
     else:
-        del app_state.oauth_request_state_keys[state]
+        await app_state.oauth_request_state_keys.delete(state)
         return RedirectResponse(url=create_telegram_link(bot_info.username), status_code=303)

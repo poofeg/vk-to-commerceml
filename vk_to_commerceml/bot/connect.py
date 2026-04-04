@@ -29,7 +29,10 @@ class SiteCallback(CallbackData, prefix='site'):
 
 @router.message(Command('logout'))
 async def command_logout(message: types.Message, state: FSMContext) -> None:
+    vk_oauth_state = await state.get_value('vk_oauth_state')
     await state.clear()
+    if vk_oauth_state:
+        await app_state.oauth_request_state_keys.delete(vk_oauth_state)
     await message.answer('Авторизация в ВК удалена')
 
 
@@ -200,12 +203,12 @@ async def select_vk_group(message: types.Message, state: FSMContext) -> None:
 @router.message()
 async def default_handler(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
-    if not (state_code := data.get('state_code')):
-        state_code = token_urlsafe()
-        await state.update_data(state_code=state_code)
+    if not (vk_oauth_state := data.get('vk_oauth_state')):
+        vk_oauth_state = token_urlsafe()
+        await state.update_data(vk_oauth_state=vk_oauth_state)
     await state.set_state(Form.vk_start)
-    app_state.oauth_request_state_keys[state_code] = state.key
-    url = URL(str(settings.base_url)) / 'oauth' / 'redirect' / state_code
+    await app_state.oauth_request_state_keys.set(vk_oauth_state, state.key)
+    url = URL(str(settings.base_url)) / 'oauth' / 'redirect' / vk_oauth_state
     await message.answer(
         f'Привет, {hbold(message.from_user.full_name if message.from_user else "Пользователь")}! '
         'Боту нужен доступ к товарам ВК.',

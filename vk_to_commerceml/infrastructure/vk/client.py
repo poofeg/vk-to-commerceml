@@ -125,19 +125,23 @@ class VkClientSession:
             if await aiofiles.os.path.exists(cache_path):
                 async with aiofiles.open(cache_path, 'rb') as cache_file:
                     return name, await cache_file.read()
-            async with self.__session.get(url) as response:
-                response.raise_for_status()
-                data = await response.read()
-                async with aiofiles.open(cache_path, 'wb') as cache_file:
-                    await cache_file.write(data)
-                return name, await response.read()
+            try:
+                async with self.__session.get(url) as response:
+                    response.raise_for_status()
+                    data = await response.read()
+                    async with aiofiles.open(cache_path, 'wb') as cache_file:
+                        await cache_file.write(data)
+                    return name, await response.read()
+            except Exception:
+                logger.exception('Error while downloading photo %s (%s)', name, url)
+                return name, b''
         tasks: list[Task[tuple[str, bytes]]] = []
         async with asyncio.TaskGroup() as tg:
             for photo in photos:
                 name = f'vk_{photo.id}.jpg'
                 url = next(iter(size.url for size in sorted(photo.sizes, key=attrgetter('width'), reverse=True)
                                 if not max_width or max_width >= size.width))
-                tasks.append(tg.create_task(download_single(name, str(url))))
+                tasks.append(tg.create_task(download_single(name, str(url)), name=f'download:{name}'))
         result: dict[str, bytes] = {}
         for task in tasks:
             name, content = task.result()

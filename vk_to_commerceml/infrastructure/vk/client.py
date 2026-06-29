@@ -139,8 +139,12 @@ class VkClientSession:
         async with asyncio.TaskGroup() as tg:
             for photo in photos:
                 name = f'vk_{photo.id}.jpg'
-                url = next(iter(size.url for size in sorted(photo.sizes, key=attrgetter('width'), reverse=True)
-                                if not max_width or max_width >= size.width))
+                try:
+                    url = next(iter(size.url for size in sorted(photo.sizes, key=attrgetter('width'), reverse=True)
+                                    if not max_width or max_width >= size.width))
+                except StopIteration:
+                    logger.warning('Photo url not found: %s', photo)
+                    continue
                 tasks.append(tg.create_task(download_single(name, str(url)), name=f'download:{name}'))
         result: dict[str, bytes] = {}
         for task in tasks:
